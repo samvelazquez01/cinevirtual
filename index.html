@@ -2,8 +2,8 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CineP2P — Sala de Cine en Tiempo Real (v5.0)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>CineP2P — Sala de Cine en Tiempo Real (v6.0 USA/Móvil)</title>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <style>
     :root {
@@ -37,10 +37,21 @@
       position: relative;
       width: 100vw;
       height: 100vh;
+      height: 100dvh;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: radial-gradient(circle at center, #0f131f 0%, #050608 100%);
+      background: #000;
+    }
+
+    /* Pseudo-Fullscreen universal para celulares (iPhone Safari + Android) cuando el navegador bloquea la API nativa */
+    .stage.pseudo-fullscreen {
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100vw !important;
+      height: 100dvh !important;
+      z-index: 99999 !important;
+      background: #000 !important;
     }
 
     video {
@@ -53,9 +64,9 @@
     /* Barra superior flotante */
     .top-bar {
       position: absolute;
-      top: 1.25rem;
-      left: 1.5rem;
-      right: 1.5rem;
+      top: 1rem;
+      left: 1rem;
+      right: 1rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -69,6 +80,7 @@
     .stage.hide-ui .top-bar,
     .stage.hide-ui .bottom-bar {
       opacity: 0;
+      pointer-events: none;
     }
 
     .stage.hide-ui {
@@ -80,12 +92,12 @@
       background: var(--panel);
       backdrop-filter: blur(14px);
       border: 1px solid var(--border);
-      padding: 0.5rem 1rem;
+      padding: 0.45rem 0.9rem;
       border-radius: 999px;
       display: flex;
       align-items: center;
-      gap: 0.65rem;
-      font-size: 0.85rem;
+      gap: 0.55rem;
+      font-size: 0.82rem;
       font-weight: 600;
       box-shadow: 0 8px 25px rgba(0, 0, 0, 0.45);
     }
@@ -110,23 +122,23 @@
       backdrop-filter: blur(18px);
       border: 1px solid var(--border);
       border-radius: 16px;
-      padding: 2rem;
+      padding: 1.75rem;
       width: 92%;
-      max-width: 450px;
+      max-width: 440px;
       text-align: center;
       box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);
       display: flex;
       flex-direction: column;
-      gap: 1.15rem;
+      gap: 1.05rem;
     }
 
     .overlay-card h2 {
-      font-size: 1.35rem;
+      font-size: 1.3rem;
       font-weight: 700;
     }
 
     .overlay-card p {
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       color: var(--muted);
       line-height: 1.45;
     }
@@ -141,7 +153,7 @@
       background: rgba(0, 0, 0, 0.45);
       border: 1px solid var(--border);
       color: var(--text);
-      padding: 0.75rem 1rem;
+      padding: 0.72rem 0.95rem;
       border-radius: 10px;
       font-size: 0.95rem;
       outline: none;
@@ -155,16 +167,17 @@
       background: var(--accent);
       color: white;
       border: none;
-      padding: 0.75rem 1.25rem;
+      padding: 0.7rem 1.15rem;
       border-radius: 10px;
       font-weight: 600;
-      font-size: 0.9rem;
+      font-size: 0.86rem;
       cursor: pointer;
       transition: background 0.15s ease, transform 0.1s ease;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 0.5rem;
+      gap: 0.45rem;
+      touch-action: manipulation;
     }
 
     .btn:hover {
@@ -174,9 +187,9 @@
     .btn-danger {
       background: rgba(239, 68, 68, 0.9);
       border: 1px solid rgba(255, 255, 255, 0.18);
-      padding: 0.5rem 0.9rem;
+      padding: 0.48rem 0.85rem;
       border-radius: 8px;
-      font-size: 0.83rem;
+      font-size: 0.82rem;
     }
 
     .btn-danger:hover {
@@ -186,9 +199,9 @@
     .btn-ghost {
       background: rgba(255, 255, 255, 0.08);
       border: 1px solid var(--border);
-      padding: 0.5rem 0.85rem;
+      padding: 0.48rem 0.8rem;
       border-radius: 8px;
-      font-size: 0.83rem;
+      font-size: 0.82rem;
     }
 
     .btn-ghost:hover {
@@ -205,15 +218,16 @@
       background: rgba(99, 102, 241, 0.96);
       color: white;
       border: 2px solid rgba(255, 255, 255, 0.35);
-      padding: 1.05rem 1.85rem;
+      padding: 1rem 1.65rem;
       border-radius: 999px;
-      font-size: 1.05rem;
+      font-size: 1rem;
       font-weight: 700;
       cursor: pointer;
       box-shadow: 0 15px 40px rgba(0, 0, 0, 0.65);
       display: none;
       align-items: center;
-      gap: 0.65rem;
+      gap: 0.6rem;
+      white-space: nowrap;
       animation: bounce 2s infinite;
     }
 
@@ -225,20 +239,20 @@
     /* Controles inferiores del reproductor */
     .bottom-bar {
       position: absolute;
-      bottom: 1.25rem;
+      bottom: 1rem;
       left: 50%;
       transform: translateX(-50%);
-      width: calc(100% - 3rem);
+      width: calc(100% - 2rem);
       max-width: 960px;
       background: var(--panel);
       backdrop-filter: blur(16px);
       border: 1px solid var(--border);
       border-radius: 14px;
-      padding: 0.7rem 1.15rem;
+      padding: 0.65rem 1rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 1rem;
+      gap: 0.75rem;
       z-index: 20;
       transition: opacity 0.35s ease;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
@@ -248,12 +262,12 @@
     .controls-group {
       display: flex;
       align-items: center;
-      gap: 0.65rem;
+      gap: 0.55rem;
       flex-wrap: wrap;
     }
 
     input[type="range"] {
-      width: 95px;
+      width: 85px;
       accent-color: var(--accent);
       cursor: pointer;
     }
@@ -261,17 +275,17 @@
     /* Panel de estadísticas de calidad en vivo */
     .stats-popover {
       position: absolute;
-      top: 4.5rem;
-      right: 1.5rem;
+      top: 4.2rem;
+      right: 1rem;
       background: var(--panel);
       backdrop-filter: blur(16px);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 0.9rem 1.1rem;
-      font-size: 0.8rem;
+      padding: 0.85rem 1.05rem;
+      font-size: 0.79rem;
       z-index: 22;
       display: none;
-      min-width: 240px;
+      min-width: 245px;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     }
 
@@ -303,16 +317,16 @@
     <!-- Barra Superior -->
     <div class="top-bar">
       <div class="pill">
-        <span>🍿 CineP2P v5.0</span>
+        <span>🍿 CineP2P v6.0</span>
         <span style="color: var(--muted);">|</span>
         <div id="statusDot" class="dot"></div>
         <span id="statusLabel">Esperando sala...</span>
       </div>
 
-      <div class="pill" style="gap: 0.5rem;">
-        <span id="liveQualityBadge" style="color: #a5b4fc;">Directo P2P</span>
-        <button id="toggleStatsBtn" class="btn btn-ghost" style="padding: 0.28rem 0.65rem;">📊 Info Señal</button>
-        <button id="leaveBtnTop" class="btn btn-danger" style="padding: 0.28rem 0.75rem; display: none;">🚪 Salir de Sala</button>
+      <div class="pill" style="gap: 0.45rem;">
+        <span id="liveQualityBadge" style="color: #a5b4fc;">Conectando...</span>
+        <button id="toggleStatsBtn" class="btn btn-ghost" style="padding: 0.28rem 0.6rem;">📊 Info Señal</button>
+        <button id="leaveBtnTop" class="btn btn-danger" style="padding: 0.28rem 0.7rem; display: none;">🚪 Salir</button>
       </div>
     </div>
 
@@ -335,14 +349,14 @@
         <span id="statAudioBitrate">0 kbps</span>
       </div>
       <div class="stats-row">
-        <span>Latencia (Ping):</span>
+        <span>Latencia / Ruta:</span>
         <span id="statPing">— ms</span>
       </div>
     </div>
 
     <!-- Tarjeta de Conexión Inicial -->
     <div id="connectCard" class="overlay-card">
-      <div style="font-size: 2.4rem;">🎬</div>
+      <div style="font-size: 2.3rem;">🎬</div>
       <h2 id="cardTitle">Conectar a la Transmisión</h2>
       <p id="cardDesc">Introduce el código de la sala o abre directamente el enlace que te compartió el emisor.</p>
       <div class="input-row">
@@ -353,7 +367,7 @@
 
     <!-- Botón para activar sonido si el navegador bloqueó el audio automático -->
     <button id="unmuteBanner" class="unmute-banner">
-      🔊 Toca aquí para activar el Audio Estéreo y Video
+      🔊 Toca aquí para activar el Audio Estéreo
     </button>
 
     <!-- Reproductor de Video Principal -->
@@ -364,14 +378,14 @@
       <div class="controls-group">
         <button id="muteBtn" class="btn btn-ghost" title="Silenciar / Activar sonido">🔊</button>
         <input id="volumeSlider" type="range" min="0" max="1" step="0.02" value="1" title="Volumen" />
-        <span id="volumeLabel" style="font-size: 0.8rem; color: var(--muted); min-width: 38px;">100%</span>
+        <span id="volumeLabel" style="font-size: 0.78rem; color: var(--muted); min-width: 36px;">100%</span>
       </div>
 
       <div class="controls-group">
         <button id="reconnectBtn" class="btn btn-ghost" title="Reconectar señal">🔄 Reconectar</button>
-        <button id="pipBtn" class="btn btn-ghost" title="Modo ventana flotante">🖼️ PiP</button>
-        <button id="fullscreenBtn" class="btn" style="padding: 0.5rem 0.95rem;">⛶ Pantalla Completa</button>
-        <button id="leaveBtnBottom" class="btn btn-danger" title="Salir de la sala actual">🚪 Salir de Sala</button>
+        <button id="zoomBtn" class="btn btn-ghost" title="Ajustar o Rellenar pantalla">🔍 Rellenar</button>
+        <button id="fullscreenBtn" class="btn" style="padding: 0.48rem 0.9rem;">⛶ Pantalla Completa</button>
+        <button id="leaveBtnBottom" class="btn btn-danger" title="Salir de la sala actual">🚪 Salir</button>
       </div>
     </div>
   </div>
@@ -393,7 +407,7 @@
     const volumeSlider = document.getElementById('volumeSlider');
     const volumeLabel = document.getElementById('volumeLabel');
     const reconnectBtn = document.getElementById('reconnectBtn');
-    const pipBtn = document.getElementById('pipBtn');
+    const zoomBtn = document.getElementById('zoomBtn');
     const fullscreenBtn = document.getElementById('fullscreenBtn');
     const leaveBtnTop = document.getElementById('leaveBtnTop');
     const leaveBtnBottom = document.getElementById('leaveBtnBottom');
@@ -413,17 +427,29 @@
     let retryTimer = null;
     let dummyViewerStream = null;
     let hasReceivedFrames = false;
+    let isAttemptingCall = false;
 
     let lastVideoBytes = 0;
     let lastAudioBytes = 0;
     let lastStatsTime = performance.now();
 
-    // Servidores STUN + TURN Internacionales redundantes (Puertos 80 y 443 UDP/TCP/TLS)
+    // Servidores STUN + TURN Norteamericanos (USA) y Globales en puertos 80 y 443 (UDP/TCP/TLS)
     const rtcConfig = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
         { urls: 'stun:stun.cloudflare.com:3478' },
+        {
+          urls: [
+            'turn:a.relay.metered.ca:80',
+            'turn:a.relay.metered.ca:80?transport=tcp',
+            'turn:a.relay.metered.ca:443',
+            'turn:a.relay.metered.ca:443?transport=tcp',
+            'turns:a.relay.metered.ca:443?transport=tcp'
+          ],
+          username: 'e8dd65c92f611c4086f8fc20',
+          credential: '2/3+R/aH1h2N+N9Y'
+        },
         {
           urls: [
             'turn:openrelay.metered.ca:80',
@@ -454,15 +480,10 @@
       if (!sdp) return sdp;
       return sdp.replace(
         /a=fmtp:(\d+) minptime=10;useinbandfec=1([^\r\n]*)/g,
-        'a=fmtp:$1 minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1;maxaveragebitrate=510000;maxplaybackrate=48000;cbr=1;usedtx=0$2'
+        'a=fmtp:$1 minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1;maxaveragebitrate=320000;maxplaybackrate=48000;cbr=1;usedtx=0$2'
       );
     }
 
-    /**
-     * Crea un stream silencioso/vacío ultra-ligero (1x1px + silencio) sin pedir permisos de cámara/micrófono.
-     * Esto permite que el espectador llame directamente al emisor con peer.call(targetRoomId, dummyStream)
-     * negociando las líneas m=video y m=audio a través de cualquier NAT/Firewall internacional o Safari iOS.
-     */
     function getOrCreateViewerDummyStream() {
       if (dummyViewerStream) return dummyViewerStream;
       try {
@@ -479,7 +500,7 @@
         const dst = audioCtx.createMediaStreamDestination();
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
-        gain.gain.value = 0; // 100% silencio
+        gain.gain.value = 0;
         osc.connect(gain);
         gain.connect(dst);
         osc.start();
@@ -501,6 +522,7 @@
     function leaveRoom() {
       clearInterval(retryTimer);
       hasReceivedFrames = false;
+      isAttemptingCall = false;
 
       if (dataConn && dataConn.open) {
         try { dataConn.send({ type: 'VIEWER_LEFT' }); } catch (e) {}
@@ -543,40 +565,65 @@
       cardDesc.textContent = 'Puedes introducir otro código de sala o volver a entrar cuando quieras.';
     }
 
+    /**
+     * En v6.0 NO ocultamos la tarjeta de carga hasta que el video realmente tenga fotogramas decodificados
+     * (evento loadedmetadata / resize / bytes > 0), evitando que se quede en pantalla negra con "0.0 Mbps".
+     */
     function handleIncomingRemoteStream(remoteStream, callObj) {
       if (!remoteStream) return;
       currentCall = callObj;
 
-      // IMPORTANTE PARA SAFARI iOS: Empezar silenciado (muted=true) para que Safari renderice el video inmediatamente y no lo deje en negro
-      remoteVideo.srcObject = remoteStream;
-      remoteVideo.muted = true;
-      remoteVideo.play().then(() => {
-        // Mostrar botón grande para activar el sonido con un toque del usuario (requerido por Safari/iOS y Chrome móvil)
-        unmuteBanner.style.display = 'flex';
-        updateMuteUI();
-      }).catch(() => {
-        unmuteBanner.style.display = 'flex';
-      });
+      if (remoteVideo.srcObject !== remoteStream) {
+        remoteVideo.srcObject = remoteStream;
+        remoteVideo.muted = true;
+        remoteVideo.play().then(() => {
+          unmuteBanner.style.display = 'flex';
+          updateMuteUI();
+        }).catch(() => {
+          unmuteBanner.style.display = 'flex';
+        });
+      }
 
-      connectCard.style.display = 'none';
-      statusDot.className = 'dot live';
-      statusLabel.textContent = `En Directo (${targetRoomId})`;
+      cardTitle.textContent = 'Negociando ruta internacional de video...';
+      cardDesc.textContent = 'Conectado con el emisor. Recibiendo primeros fotogramas de alta calidad...';
+      statusLabel.textContent = `Recibiendo señal (${targetRoomId})...`;
     }
+
+    remoteVideo.addEventListener('loadeddata', () => {
+      if (remoteVideo.videoWidth > 0) {
+        hasReceivedFrames = true;
+        isAttemptingCall = false;
+        connectCard.style.display = 'none';
+        statusDot.className = 'dot live';
+        statusLabel.textContent = `En Directo (${targetRoomId})`;
+      }
+    });
 
     function initiateDirectMediaCall() {
       if (!peer || !targetRoomId || hasReceivedFrames) return;
+
+      // Si ya hay una llamada negociando candidatos ICE entre países, NO crear otra encima hasta que pasen 12 segundos o falle
+      if (currentCall && currentCall.peerConnection) {
+        const state = currentCall.peerConnection.connectionState;
+        if (state === 'connecting' || state === 'connected') {
+          return;
+        }
+      }
+
       try {
+        isAttemptingCall = true;
         const dummy = getOrCreateViewerDummyStream();
         const outboundCall = peer.call(targetRoomId, dummy, {
           sdpTransform: enhanceAnswerSdp
         });
         if (!outboundCall) return;
 
+        currentCall = outboundCall;
         outboundCall.on('stream', (remoteStream) => {
           handleIncomingRemoteStream(remoteStream, outboundCall);
         });
       } catch (e) {
-        console.warn('Intento de llamada directa:', e);
+        isAttemptingCall = false;
       }
     }
 
@@ -584,6 +631,7 @@
       if (!roomId) return;
       clearInterval(retryTimer);
       hasReceivedFrames = false;
+      isAttemptingCall = false;
 
       targetRoomId = roomId.trim();
       roomInput.value = targetRoomId;
@@ -594,7 +642,7 @@
       window.history.replaceState({}, '', newUrl);
 
       cardTitle.textContent = 'Conectando a la sala...';
-      cardDesc.textContent = `Estableciendo conexión internacional con "${targetRoomId}"...`;
+      cardDesc.textContent = `Estableciendo ruta directa con "${targetRoomId}"...`;
       statusDot.className = 'dot';
       statusLabel.textContent = `Sala: ${targetRoomId}`;
 
@@ -608,28 +656,36 @@
       });
 
       peer.on('open', () => {
-        // 1. Iniciar canal de datos Y TAMBIÉN llamada directa de medios (doble vía para atravesar cualquier firewall/país)
         openDataChannel();
         initiateDirectMediaCall();
 
-        // Reintentar cada 3.5 segundos mientras no estén entrando bytes reales de video
+        // Intervalo amplio (10 segundos) para dar tiempo a que el servidor TURN de EE. UU. termine el handshake ICE sin ser interrumpido
         clearInterval(retryTimer);
         retryTimer = setInterval(() => {
           if (!hasReceivedFrames && peer && !peer.destroyed) {
-            if (dataConn && dataConn.open) {
-              dataConn.send({ type: 'REQUEST_STREAM' });
-            } else {
-              openDataChannel();
+            const pcState = currentCall && currentCall.peerConnection ? currentCall.peerConnection.connectionState : 'none';
+            if (pcState === 'failed' || pcState === 'disconnected' || pcState === 'closed' || pcState === 'none') {
+              currentCall = null;
+              if (dataConn && dataConn.open) {
+                dataConn.send({ type: 'REQUEST_STREAM' });
+              } else {
+                openDataChannel();
+              }
+              initiateDirectMediaCall();
             }
-            initiateDirectMediaCall();
           } else if (hasReceivedFrames) {
             clearInterval(retryTimer);
           }
-        }, 3500);
+        }, 8000);
       });
 
-      // 2. Si el emisor nos devuelve la llamada hacia nosotros, también la aceptamos
+      // Si el emisor inicia o reinicia la transmisión y nos llama él a nosotros:
       peer.on('call', (incomingCall) => {
+        if (currentCall && currentCall !== incomingCall) {
+          try { currentCall.close(); } catch (e) {}
+        }
+        currentCall = incomingCall;
+
         incomingCall.answer(undefined, {
           sdpTransform: enhanceAnswerSdp
         });
@@ -643,10 +699,10 @@
         console.warn('Error Peer:', err);
         if (!hasReceivedFrames) {
           statusDot.className = 'dot';
-          statusLabel.textContent = 'Reintentando conexión...';
+          statusLabel.textContent = 'Esperando señal...';
           connectCard.style.display = 'flex';
           cardTitle.textContent = 'Conectando con el Emisor...';
-          cardDesc.textContent = `Buscando señal activa en la sala "${targetRoomId}". Verifica que el emisor haya pulsado "Transmitir Pantalla".`;
+          cardDesc.textContent = `Sala "${targetRoomId}". Verifica que el emisor tenga activa la transmisión.`;
         }
       });
     }
@@ -659,20 +715,19 @@
 
         dataConn.on('open', () => {
           if (!hasReceivedFrames) {
-            statusLabel.textContent = 'Conectado. Recibiendo señal...';
-            cardTitle.textContent = 'Conectado con el Emisor';
-            cardDesc.textContent = 'Abriendo flujo de video y audio...';
+            statusLabel.textContent = 'Sala conectada. Abriendo video...';
           }
-          dataConn.send({ type: 'REQUEST_STREAM' });
         });
 
         dataConn.on('data', (data) => {
           if (!data) return;
           if (data.type === 'WAITING_STREAM') {
-            cardTitle.textContent = 'Dentro de la sala — Esperando captura';
-            cardDesc.textContent = 'Estás conectado. En cuanto el emisor pulse "Transmitir Pantalla + Audio", verás la película.';
+            cardTitle.textContent = 'Dentro de la sala — Esperando película';
+            cardDesc.textContent = 'Conectado correctamente. En cuanto el emisor pulse "Transmitir Pantalla", verás la imagen.';
           } else if (data.type === 'STREAM_READY') {
-            initiateDirectMediaCall();
+            if (!hasReceivedFrames) {
+              initiateDirectMediaCall();
+            }
           } else if (data.type === 'STREAM_STOPPED') {
             hasReceivedFrames = false;
             remoteVideo.srcObject = null;
@@ -688,7 +743,7 @@
       } catch (e) {}
     }
 
-    // Activar sonido y reproducción con gesto del usuario (Desbloquea Safari iOS y Chrome Android/PC)
+    // Desbloqueo de audio
     unmuteBanner.addEventListener('click', () => {
       remoteVideo.muted = false;
       remoteVideo.volume = parseFloat(volumeSlider.value) || 1;
@@ -725,34 +780,82 @@
       updateMuteUI();
     });
 
-    fullscreenBtn.addEventListener('click', () => {
-      if (remoteVideo.webkitEnterFullscreen) {
-        // Soporte nativo de pantalla completa para iPhone / Safari iOS
-        remoteVideo.webkitEnterFullscreen();
-      } else if (!document.fullscreenElement) {
-        stage.requestFullscreen().catch(() => {});
+    // Botón para alternar entre ver la película completa (contain) o rellenar toda la pantalla del celular (cover)
+    zoomBtn.addEventListener('click', () => {
+      if (remoteVideo.style.objectFit === 'cover') {
+        remoteVideo.style.objectFit = 'contain';
+        zoomBtn.innerHTML = '🔍 Rellenar';
       } else {
-        document.exitFullscreen().catch(() => {});
+        remoteVideo.style.objectFit = 'cover';
+        zoomBtn.innerHTML = '📐 Ajustar';
       }
     });
 
-    remoteVideo.addEventListener('dblclick', () => {
-      fullscreenBtn.click();
-    });
-
-    pipBtn.addEventListener('click', async () => {
+    /**
+     * PANTALLA COMPLETA UNIVERSAL PARA CELULARES (iOS Safari + Chrome Android + PC):
+     * 1) Intenta Fullscreen estándar sobre el contenedor.
+     * 2) Si es iPhone (Safari iOS), usa webkitEnterFullscreen() directamente sobre el elemento <video>.
+     * 3) Si el navegador móvil bloquea ambos, activa el modo pantalla completa inmersivo CSS y bloquea orientación horizontal.
+     */
+    async function toggleMobileAndDesktopFullscreen() {
       try {
-        if (document.pictureInPictureElement) {
-          await document.exitPictureInPicture();
-        } else if (remoteVideo.readyState >= 1) {
-          await remoteVideo.requestPictureInPicture();
+        // Caso 1: Salir si ya estamos en Fullscreen estándar o pseudo-fullscreen
+        if (document.fullscreenElement || document.webkitFullscreenElement) {
+          if (document.exitFullscreen) await document.exitFullscreen();
+          else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+          return;
         }
-      } catch (e) {}
-    });
+
+        if (stage.classList.contains('pseudo-fullscreen')) {
+          stage.classList.remove('pseudo-fullscreen');
+          stage.classList.remove('hide-ui');
+          fullscreenBtn.innerHTML = '⛶ Pantalla Completa';
+          return;
+        }
+
+        // Caso 2: API estándar (PC y Android)
+        if (stage.requestFullscreen) {
+          await stage.requestFullscreen();
+          if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('landscape').catch(() => {});
+          }
+          return;
+        }
+
+        if (stage.webkitRequestFullscreen) {
+          stage.webkitRequestFullscreen();
+          return;
+        }
+
+        // Caso 3: iPhone / Safari iOS nativo sobre el elemento <video>
+        if (remoteVideo.webkitEnterFullscreen) {
+          remoteVideo.webkitEnterFullscreen();
+          return;
+        }
+      } catch (err) {
+        // Fallback: Si Safari iOS aún no permite webkitEnterFullscreen o falla la promesa, intentar sobre el video o usar modo inmersivo
+        if (remoteVideo.webkitEnterFullscreen) {
+          try {
+            remoteVideo.webkitEnterFullscreen();
+            return;
+          } catch (e2) {}
+        }
+      }
+
+      // Caso 4: Modo inmersivo en pantalla completa para cualquier navegador móvil
+      stage.classList.add('pseudo-fullscreen');
+      fullscreenBtn.innerHTML = '✕ Salir Pantalla Completa';
+      window.scrollTo(0, 1);
+    }
+
+    fullscreenBtn.addEventListener('click', toggleMobileAndDesktopFullscreen);
+
+    remoteVideo.addEventListener('dblclick', toggleMobileAndDesktopFullscreen);
 
     reconnectBtn.addEventListener('click', () => {
       const code = targetRoomId || roomInput.value.trim();
       if (code) {
+        currentCall = null;
         connectToBroadcaster(code);
       }
     });
@@ -778,9 +881,9 @@
       }
     });
 
-    // Auto-ocultar controles cuando el ratón no se mueve
+    // Auto-ocultar controles en PC y al tocar la pantalla en celulares
     let uiTimeout = null;
-    stage.addEventListener('mousemove', () => {
+    function showUiTemporarily() {
       stage.classList.remove('hide-ui');
       clearTimeout(uiTimeout);
       if (connectCard.style.display === 'none') {
@@ -788,9 +891,22 @@
           if (statsPopover.style.display !== 'block') {
             stage.classList.add('hide-ui');
           }
-        }, 3000);
+        }, 3200);
       }
-    });
+    }
+
+    stage.addEventListener('mousemove', showUiTemporarily);
+    stage.addEventListener('touchstart', (e) => {
+      if (e.target === remoteVideo || e.target === stage) {
+        if (stage.classList.contains('hide-ui')) {
+          showUiTemporarily();
+        } else if (connectCard.style.display === 'none') {
+          stage.classList.add('hide-ui');
+        }
+      } else {
+        showUiTemporarily();
+      }
+    }, { passive: true });
 
     // Telemetría de recepción en vivo
     setInterval(async () => {
@@ -804,8 +920,11 @@
         stats.forEach(report => {
           if (report.type === 'inbound-rtp' && report.kind === 'video') {
             const bytes = report.bytesReceived || 0;
-            if (bytes > 1000) {
+            if (bytes > 2000 && !hasReceivedFrames) {
               hasReceivedFrames = true;
+              connectCard.style.display = 'none';
+              statusDot.className = 'dot live';
+              statusLabel.textContent = `En Directo (${targetRoomId})`;
             }
             if (elapsedSec > 0 && lastVideoBytes > 0) {
               const mbps = (((bytes - lastVideoBytes) * 8) / elapsedSec / 1_000_000).toFixed(2);
