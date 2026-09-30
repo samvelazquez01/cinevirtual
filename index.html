@@ -8,13 +8,14 @@
   <style>
     :root {
       --bg: #050608;
-      --panel: rgba(18, 22, 33, 0.88);
-      --border: rgba(255, 255, 255, 0.12);
+      --panel: rgba(18, 22, 33, 0.9);
+      --border: rgba(255, 255, 255, 0.14);
       --text: #f8fafc;
       --muted: #94a3b8;
       --accent: #6366f1;
       --accent-hover: #4f46e5;
       --success: #10b981;
+      --danger: #ef4444;
     }
 
     * {
@@ -109,7 +110,7 @@
       border-radius: 16px;
       padding: 2rem;
       width: 92%;
-      max-width: 440px;
+      max-width: 450px;
       text-align: center;
       box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);
       display: flex;
@@ -168,6 +169,18 @@
       background: var(--accent-hover);
     }
 
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      padding: 0.5rem 0.9rem;
+      border-radius: 8px;
+      font-size: 0.83rem;
+    }
+
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+
     .btn-ghost {
       background: rgba(255, 255, 255, 0.08);
       border: 1px solid var(--border);
@@ -214,7 +227,7 @@
       left: 50%;
       transform: translateX(-50%);
       width: calc(100% - 3rem);
-      max-width: 900px;
+      max-width: 960px;
       background: var(--panel);
       backdrop-filter: blur(16px);
       border: 1px solid var(--border);
@@ -232,11 +245,12 @@
     .controls-group {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 0.65rem;
+      flex-wrap: wrap;
     }
 
     input[type="range"] {
-      width: 100px;
+      width: 95px;
       accent-color: var(--accent);
       cursor: pointer;
     }
@@ -254,7 +268,7 @@
       font-size: 0.8rem;
       z-index: 22;
       display: none;
-      min-width: 230px;
+      min-width: 240px;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     }
 
@@ -294,7 +308,8 @@
 
       <div class="pill" style="gap: 0.5rem;">
         <span id="liveQualityBadge" style="color: #a5b4fc;">Directo P2P</span>
-        <button id="toggleStatsBtn" class="btn btn-ghost" style="padding: 0.25rem 0.6rem;">📊 Info Señal</button>
+        <button id="toggleStatsBtn" class="btn btn-ghost" style="padding: 0.28rem 0.65rem;">📊 Info Señal</button>
+        <button id="leaveBtnTop" class="btn btn-danger" style="padding: 0.28rem 0.75rem; display: none;">🚪 Salir de Sala</button>
       </div>
     </div>
 
@@ -353,6 +368,7 @@
         <button id="reconnectBtn" class="btn btn-ghost" title="Reconectar señal">🔄 Reconectar</button>
         <button id="pipBtn" class="btn btn-ghost" title="Modo ventana flotante">🖼️ PiP</button>
         <button id="fullscreenBtn" class="btn" style="padding: 0.5rem 0.95rem;">⛶ Pantalla Completa</button>
+        <button id="leaveBtnBottom" class="btn btn-danger" title="Salir de la sala actual">🚪 Salir de Sala</button>
       </div>
     </div>
   </div>
@@ -376,6 +392,8 @@
     const reconnectBtn = document.getElementById('reconnectBtn');
     const pipBtn = document.getElementById('pipBtn');
     const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const leaveBtnTop = document.getElementById('leaveBtnTop');
+    const leaveBtnBottom = document.getElementById('leaveBtnBottom');
     const toggleStatsBtn = document.getElementById('toggleStatsBtn');
     const statsPopover = document.getElementById('statsPopover');
 
@@ -389,6 +407,7 @@
     let dataConn = null;
     let currentCall = null;
     let targetRoomId = null;
+    let retryTimer = null;
 
     let lastVideoBytes = 0;
     let lastAudioBytes = 0;
@@ -404,20 +423,66 @@
       sdpSemantics: 'unified-plan'
     };
 
-    // Asegura que nuestra respuesta SDP también acepte audio estéreo de 510 kbps y alto bitrate
     function enhanceAnswerSdp(sdp) {
+      if (!sdp) return sdp;
       return sdp.replace(
-        /a=fmtp:(\d+) minptime=10;useinbandfec=1/g,
-        'a=fmtp:$1 minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1;maxaveragebitrate=510000;maxplaybackrate=48000;cbr=1;usedtx=0'
+        /a=fmtp:(\d+) minptime=10;useinbandfec=1([^\r\n]*)/g,
+        'a=fmtp:$1 minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1;maxaveragebitrate=510000;maxplaybackrate=48000;cbr=1;usedtx=0$2'
       );
+    }
+
+    function leaveRoom() {
+      clearInterval(retryTimer);
+      if (dataConn && dataConn.open) {
+        try { dataConn.send({ type: 'VIEWER_LEFT' }); } catch (e) {}
+      }
+      if (currentCall) {
+        try { currentCall.close(); } catch (e) {}
+        currentCall = null;
+      }
+      if (dataConn) {
+        try { dataConn.close(); } catch (e) {}
+        dataConn = null;
+      }
+      if (peer) {
+        try { peer.destroy(); } catch (e) {}
+        peer = null;
+      }
+
+      remoteVideo.srcObject = null;
+      targetRoomId = null;
+      unmuteBanner.style.display = 'none';
+      leaveBtnTop.style.display = 'none';
+
+      // Limpiar parámetro ?sala de la barra de direcciones para poder escribir otro
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('sala');
+      cleanUrl.searchParams.delete('id');
+      cleanUrl.searchParams.delete('room');
+      window.history.replaceState({}, '', cleanUrl);
+
+      statusDot.className = 'dot';
+      statusLabel.textContent = 'Fuera de la sala';
+      liveQualityBadge.textContent = 'Desconectado';
+      statRes.textContent = '—';
+      statFps.textContent = '—';
+      statBitrate.textContent = '0.0 Mbps';
+      statAudioBitrate.textContent = '0 kbps';
+      statPing.textContent = '— ms';
+
+      connectCard.style.display = 'flex';
+      cardTitle.textContent = 'Has salido de la sala';
+      cardDesc.textContent = 'Puedes introducir otro código de sala o volver a entrar cuando quieras.';
     }
 
     function connectToBroadcaster(roomId) {
       if (!roomId) return;
+      clearInterval(retryTimer);
+
       targetRoomId = roomId.trim();
       roomInput.value = targetRoomId;
+      leaveBtnTop.style.display = 'inline-flex';
 
-      // Actualizar la URL sin recargar para que sea fácil de guardar
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.set('sala', targetRoomId);
       window.history.replaceState({}, '', newUrl);
@@ -425,10 +490,10 @@
       cardTitle.textContent = 'Conectando a la sala...';
       cardDesc.textContent = `Buscando señal en vivo de "${targetRoomId}"...`;
       statusDot.className = 'dot';
-      statusLabel.textContent = `Conectando a ${targetRoomId}...`;
+      statusLabel.textContent = `Sala: ${targetRoomId}`;
 
       if (peer) {
-        peer.destroy();
+        try { peer.destroy(); } catch (e) {}
       }
 
       peer = new Peer({
@@ -437,22 +502,7 @@
       });
 
       peer.on('open', () => {
-        // Abrir canal de datos con el emisor para solicitar que nos llame con el stream
-        dataConn = peer.connect(targetRoomId, { reliable: true });
-
-        dataConn.on('open', () => {
-          statusLabel.textContent = 'Conectado. Esperando video del emisor...';
-          cardTitle.textContent = 'Conectado con el Emisor';
-          cardDesc.textContent = 'Esperando a que el emisor inicie la captura de ventana/película...';
-          dataConn.send({ type: 'REQUEST_STREAM' });
-        });
-
-        dataConn.on('data', (data) => {
-          if (data && data.type === 'WAITING_STREAM') {
-            cardTitle.textContent = 'Sala lista — Esperando película';
-            cardDesc.textContent = 'Estás dentro de la sala. En cuanto el emisor pulse "Capturar Ventana", la imagen aparecerá automáticamente.';
-          }
-        });
+        openDataChannel();
       });
 
       // Recibir la llamada WebRTC con el stream de alta calidad
@@ -467,20 +517,12 @@
         });
 
         call.on('stream', (remoteStream) => {
-          // Aumentar jitterBufferTarget si está disponible para reproducción de película ultra fluida sin micro-cortes
-          try {
-            const receivers = call.peerConnection.getReceivers();
-            receivers.forEach(r => {
-              if ('playoutDelayHint' in r) {
-                r.playoutDelayHint = 0.06; // 60ms de buffer suave para evitar tirones de red manteniendo sincronía A/V
-              }
-            });
-          } catch (e) {}
+          clearInterval(retryTimer);
 
           remoteVideo.srcObject = remoteStream;
           connectCard.style.display = 'none';
           statusDot.className = 'dot live';
-          statusLabel.textContent = 'En Directo (Calidad Original)';
+          statusLabel.textContent = `En Directo (${targetRoomId})`;
 
           // Intentar reproducir con sonido; si el navegador exige interacción del usuario, mostrar el botón de 1 clic
           remoteVideo.muted = false;
@@ -488,7 +530,7 @@
           if (playPromise !== undefined) {
             playPromise.catch(() => {
               remoteVideo.muted = true;
-              remoteVideo.play();
+              remoteVideo.play().catch(() => {});
               unmuteBanner.style.display = 'flex';
               updateMuteUI();
             });
@@ -497,20 +539,60 @@
 
         call.on('close', () => {
           statusDot.className = 'dot';
-          statusLabel.textContent = 'Transmisión finalizada o en pausa';
+          statusLabel.textContent = 'Transmisión en pausa';
           connectCard.style.display = 'flex';
           cardTitle.textContent = 'Transmisión en pausa';
-          cardDesc.textContent = 'El emisor ha detenido la captura. Se reconectará automáticamente cuando vuelva a transmitir.';
+          cardDesc.textContent = 'El emisor detuvo la captura. En cuanto vuelva a compartir, se verá automáticamente.';
         });
       });
 
       peer.on('error', (err) => {
         console.warn('Error Peer:', err);
         statusDot.className = 'dot';
-        statusLabel.textContent = 'Emisor no encontrado aún';
+        statusLabel.textContent = 'Esperando al emisor...';
         connectCard.style.display = 'flex';
-        cardTitle.textContent = 'No se encontró la sala activa';
-        cardDesc.textContent = 'Asegúrate de que el emisor tenga abierta la página emisor.html y verifica el código.';
+        cardTitle.textContent = 'Esperando al Emisor...';
+        cardDesc.textContent = `Aún no está transmitiendo la sala "${targetRoomId}". Reintentando conexión automáticamente...`;
+      });
+    }
+
+    function openDataChannel() {
+      if (!peer || !targetRoomId) return;
+
+      dataConn = peer.connect(targetRoomId, { reliable: true });
+
+      dataConn.on('open', () => {
+        statusLabel.textContent = 'Conectado. Solicitando video...';
+        cardTitle.textContent = 'Conectado con el Emisor';
+        cardDesc.textContent = 'Recibiendo señal de video y audio...';
+        dataConn.send({ type: 'REQUEST_STREAM' });
+
+        // Si en 2.5 segundos aún no llegó el stream de video, volver a pedirlo automáticamente
+        clearInterval(retryTimer);
+        retryTimer = setInterval(() => {
+          if ((!remoteVideo.srcObject || remoteVideo.readyState === 0) && dataConn && dataConn.open) {
+            dataConn.send({ type: 'REQUEST_STREAM' });
+          } else {
+            clearInterval(retryTimer);
+          }
+        }, 2500);
+      });
+
+      dataConn.on('data', (data) => {
+        if (!data) return;
+        if (data.type === 'WAITING_STREAM') {
+          cardTitle.textContent = 'Dentro de la sala — Esperando captura';
+          cardDesc.textContent = 'Estás conectado. En cuanto el emisor pulse "Capturar Pantalla + Audio PC", verás la película automáticamente.';
+        } else if (data.type === 'STREAM_STOPPED') {
+          remoteVideo.srcObject = null;
+          connectCard.style.display = 'flex';
+          cardTitle.textContent = 'Captura detenida por el emisor';
+          cardDesc.textContent = 'Esperando a que el emisor seleccione otra ventana o pantalla...';
+        } else if (data.type === 'ROOM_CLOSED') {
+          leaveRoom();
+          cardTitle.textContent = 'El emisor cerró la sala';
+          cardDesc.textContent = 'La sesión ha finalizado.';
+        }
       });
     }
 
@@ -558,7 +640,6 @@
       }
     });
 
-    // Doble clic en el video para pantalla completa
     remoteVideo.addEventListener('dblclick', () => {
       fullscreenBtn.click();
     });
@@ -574,10 +655,14 @@
     });
 
     reconnectBtn.addEventListener('click', () => {
-      if (targetRoomId) {
-        connectToBroadcaster(targetRoomId);
+      const code = targetRoomId || roomInput.value.trim();
+      if (code) {
+        connectToBroadcaster(code);
       }
     });
+
+    leaveBtnTop.addEventListener('click', leaveRoom);
+    leaveBtnBottom.addEventListener('click', leaveRoom);
 
     toggleStatsBtn.addEventListener('click', () => {
       const visible = statsPopover.style.display === 'block';

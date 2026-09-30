@@ -99,7 +99,7 @@
       margin: 0 auto;
       padding: 1.5rem 2rem;
       display: grid;
-      grid-template-columns: 1fr 400px;
+      grid-template-columns: 1fr 410px;
       gap: 1.5rem;
     }
 
@@ -151,7 +151,7 @@
       text-align: center;
       color: var(--muted);
       padding: 2rem;
-      max-width: 460px;
+      max-width: 500px;
     }
 
     .preview-placeholder svg {
@@ -175,10 +175,10 @@
       align-items: center;
       justify-content: center;
       gap: 0.5rem;
-      padding: 0.7rem 1.25rem;
+      padding: 0.7rem 1.2rem;
       border-radius: 9px;
       font-weight: 600;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       border: none;
       cursor: pointer;
       transition: all 0.15s ease;
@@ -196,6 +196,14 @@
 
     .btn-primary:hover:not(:disabled) {
       background: var(--accent-hover);
+    }
+
+    .btn-success {
+      background: var(--success);
+    }
+
+    .btn-success:hover:not(:disabled) {
+      background: #059669;
     }
 
     .btn-danger {
@@ -271,21 +279,30 @@
     }
 
     .stat-value {
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       font-weight: 700;
       margin-top: 0.2rem;
       font-variant-numeric: tabular-nums;
     }
 
-    .audio-warning {
-      background: rgba(245, 158, 11, 0.12);
-      border: 1px solid rgba(245, 158, 11, 0.35);
-      color: #fcd34d;
-      padding: 0.75rem;
+    .info-banner {
+      padding: 0.85rem 1rem;
       border-radius: 8px;
-      font-size: 0.82rem;
-      line-height: 1.4;
+      font-size: 0.83rem;
+      line-height: 1.45;
       display: none;
+    }
+
+    .info-banner.warning {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.38);
+      color: #fde68a;
+    }
+
+    .info-banner.ok {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.38);
+      color: #a7f3d0;
     }
 
     .tip-box {
@@ -316,9 +333,14 @@
       <span>🎬 CineP2P Emisor</span>
       <span class="badge-pro">RAW / High-Bitrate WebRTC</span>
     </div>
-    <div class="status-pill">
-      <div id="statusDot" class="dot"></div>
-      <span id="statusText">Inicializando red P2P...</span>
+    <div style="display: flex; align-items: center; gap: 0.75rem;">
+      <div class="status-pill">
+        <div id="statusDot" class="dot"></div>
+        <span id="statusText">Inicializando sala...</span>
+      </div>
+      <button id="leaveRoomBtn" class="btn btn-danger" style="padding: 0.45rem 0.9rem; font-size: 0.82rem;">
+        🚪 Cerrar / Salir de Sala
+      </button>
     </div>
   </header>
 
@@ -326,7 +348,7 @@
     <!-- Columna Izquierda: Vista previa y Controles -->
     <div class="card">
       <div class="card-title">
-        <span>Vista Previa de Captura (Local Silenciada para evitar eco)</span>
+        <span>Vista Previa de Captura (Silenciada en tu vista para no hacer eco)</span>
         <span id="captureBadge" style="font-size: 0.8rem; color: var(--muted);">Sin señal</span>
       </div>
 
@@ -336,32 +358,30 @@
           <svg fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 20.25h12m-7.5-3v3m3-3v3m-10.125-3h17.25c.621 0 1.125-.504 1.125-1.125V4.875c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125z" />
           </svg>
-          <h3 style="color: var(--text); margin-bottom: 0.4rem;">Listo para transmitir en calidad original</h3>
-          <p style="font-size: 0.88rem; line-height: 1.45;">
-            Haz clic en <strong>Capturar Ventana / Pestaña</strong>. Asegúrate de marcar la casilla <strong>"Compartir también el audio de la pestaña / sistema"</strong> en la ventana emergente del navegador.
+          <h3 style="color: var(--text); margin-bottom: 0.4rem;">Transmitir tu App de Películas con Imagen + Audio</h3>
+          <p style="font-size: 0.86rem; line-height: 1.5;">
+            ⚠️ <strong>Importante en Windows:</strong> Si tu película está en una App de tu PC, asegúrate de que la ventana de tu App <strong>NO esté minimizada</strong> (si la minimizas, Windows congela el video a 0 FPS y se ve negro).
           </p>
         </div>
       </div>
 
-      <div id="audioAlert" class="audio-warning">
-        ⚠️ <strong>Atención:</strong> Estás compartiendo imagen pero <strong>NO se detectó pista de audio</strong>. Si quieres que la otra persona escuche la película, detén la captura, vuelve a elegir la pestaña/pantalla y activa la casilla <em>"Compartir audio"</em> abajo a la izquierda.
-      </div>
+      <div id="audioStatusBanner" class="info-banner"></div>
 
       <div class="controls-bar">
-        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
-          <button id="startBtn" class="btn btn-primary">
-            <span>🖥️ Capturar App de PC / Pantalla</span>
+        <div style="display: flex; gap: 0.65rem; flex-wrap: wrap;">
+          <button id="startMonitorBtn" class="btn btn-primary" title="Captura tu pantalla completa con el audio del sistema en 1 solo paso">
+            <span>🖥️ Capturar Pantalla + Audio PC (1 Clic)</span>
           </button>
-          <button id="addAudioBtn" class="btn btn-secondary" style="display: none;" title="Si capturaste solo una Ventana y Windows no te dejó marcar audio, pulsa aquí para capturar el audio del sistema">
-            <span>🔊 Añadir Audio del PC</span>
+          <button id="startWindowBtn" class="btn btn-secondary" title="Captura únicamente la ventana de tu App de Películas">
+            <span>🪟 Capturar Solo Ventana de App</span>
+          </button>
+          <button id="addAudioBtn" class="btn btn-success" style="display: none;">
+            <span>🔊 Vincular Audio del Sistema</span>
           </button>
           <button id="stopBtn" class="btn btn-danger" disabled>
-            <span>⏹️ Detener Transmisión</span>
+            <span>⏹️ Detener Captura</span>
           </button>
         </div>
-        <span style="font-size: 0.8rem; color: var(--muted);">
-          Audio: <strong>Opus 510 kbps Estéreo CBR</strong> (Sin compresión de voz)
-        </span>
       </div>
     </div>
 
@@ -370,28 +390,28 @@
       <!-- Enlace para compartir -->
       <div class="card">
         <div class="card-title">
-          <span>🔗 Enlace para el Espectador</span>
-          <span id="viewerCount" style="font-size: 0.8rem; color: var(--success);">0 conectados</span>
+          <span>🔗 Sala y Enlace de Invitación</span>
+          <span id="viewerCount" style="font-size: 0.8rem; color: var(--success);">0 espectadores</span>
         </div>
 
         <div class="form-group">
           <label>
-            <span>Código de Sala (Opcional, puedes personalizarlo)</span>
+            <span>Código de Sala</span>
           </label>
           <div class="link-box">
             <input type="text" id="roomIdInput" placeholder="Generando..." />
-            <button id="applyRoomBtn" class="btn btn-secondary" style="padding: 0.6rem 0.9rem;" title="Cambiar ID de sala">
-              Aplicar
+            <button id="applyRoomBtn" class="btn btn-secondary" style="padding: 0.6rem 0.9rem; white-space: nowrap;">
+              Cambiar Sala
             </button>
           </div>
         </div>
 
         <div class="form-group">
-          <label><span>Enlace directo (Pásale este link a la otra persona)</span></label>
+          <label><span>Enlace directo para la otra persona</span></label>
           <div class="link-box">
             <input type="text" id="shareUrlInput" readonly />
             <button id="copyBtn" class="btn btn-primary" style="white-space: nowrap;">
-              📋 Copiar
+              📋 Copiar Link
             </button>
           </div>
         </div>
@@ -401,15 +421,6 @@
       <div class="card">
         <div class="card-title">
           <span>⚙️ Parámetros de Calidad Sin Pérdidas</span>
-        </div>
-
-        <div class="form-group">
-          <label><span>¿Qué vas a capturar de tu PC?</span></label>
-          <select id="surfaceSelect">
-            <option value="window" selected>🪟 Ventana de App de Películas (VLC, Stremio, Kodi, App PC)</option>
-            <option value="monitor">🖥️ Pantalla Completa (Incluye Video de tu App + Audio del Sistema en 1 paso)</option>
-            <option value="browser">🌐 Pestaña del Navegador</option>
-          </select>
         </div>
 
         <div class="form-group">
@@ -428,26 +439,15 @@
         <div class="form-group">
           <label><span>Prioridad del Codificador WebRTC</span></label>
           <select id="degradationSelect">
-            <option value="maintain-resolution" selected>Mantener Resolución 1:1 (Prohibir que se vea borroso)</option>
+            <option value="maintain-resolution" selected>Mantener Resolución 1:1 (Prohibir bajar nitidez)</option>
             <option value="maintain-framerate">Priorizar 60 FPS constantes (Fluidez máxima)</option>
             <option value="balanced">Equilibrado</option>
           </select>
         </div>
 
-        <div class="form-group">
-          <label><span>Códec de Video Preferido</span></label>
-          <select id="codecSelect">
-            <option value="VP9" selected>VP9 (Mayor nitidez y color a alto bitrate)</option>
-            <option value="AV1">AV1 (Última generación si tu GPU lo soporta)</option>
-            <option value="H264">H.264 (Aceleración por Hardware rápida / Bajo uso CPU)</option>
-            <option value="AUTO">Automático del Navegador</option>
-          </select>
-        </div>
-
         <div class="tip-box">
-          💡 <strong>Cómo capturar tu App de Películas con Audio en Windows:</strong><br/>
-          • <strong>Opción A (Más fácil):</strong> En la ventana que se abre arriba, haz clic en la pestaña <strong>"Pantalla completa"</strong>, selecciona tu monitor, marca abajo <strong>"Compartir audio del sistema"</strong> y pon tu app de pelis en grande.<br/>
-          • <strong>Opción B (Solo la ventana de la App):</strong> Elige la pestaña <strong>"Ventana"</strong> → tu App de Pelis. Y si necesitas el sonido, pulsa el botón <strong>"🔊 Añadir Audio del PC"</strong> que aparecerá al lado.
+          💡 <strong>¿Por qué elegir "Capturar Pantalla + Audio PC"?</strong><br/>
+          En Windows, cuando eliges <strong>"Pantalla completa"</strong> y activas el interruptor <strong>"Compartir también el audio del sistema"</strong>, el navegador captura <strong>imagen + sonido estéreo juntos</strong> al instante. Si en cambio eliges <em>"Solo Ventana de App"</em>, no minimices la ventana de la película para que Windows no congele los FPS.
         </div>
       </div>
 
@@ -470,8 +470,8 @@
             <div class="stat-value" id="statVideoBitrate">0.0 Mbps</div>
           </div>
           <div class="stat-item">
-            <div class="stat-label">Audio / Códec</div>
-            <div class="stat-value" id="statCodec">Estéreo 510k</div>
+            <div class="stat-label">Estado Audio</div>
+            <div class="stat-value" id="statAudioState">Sin audio</div>
           </div>
         </div>
       </div>
@@ -479,12 +479,14 @@
   </main>
 
   <script>
-    // Elementos UI
     const localVideo = document.getElementById('localVideo');
     const placeholder = document.getElementById('placeholder');
-    const startBtn = document.getElementById('startBtn');
+    const startMonitorBtn = document.getElementById('startMonitorBtn');
+    const startWindowBtn = document.getElementById('startWindowBtn');
     const addAudioBtn = document.getElementById('addAudioBtn');
     const stopBtn = document.getElementById('stopBtn');
+    const leaveRoomBtn = document.getElementById('leaveRoomBtn');
+
     const statusDot = document.getElementById('statusDot');
     const statusText = document.getElementById('statusText');
     const roomIdInput = document.getElementById('roomIdInput');
@@ -493,25 +495,28 @@
     const copyBtn = document.getElementById('copyBtn');
     const viewerCountEl = document.getElementById('viewerCount');
     const captureBadge = document.getElementById('captureBadge');
-    const audioAlert = document.getElementById('audioAlert');
+    const audioStatusBanner = document.getElementById('audioStatusBanner');
 
-    const surfaceSelect = document.getElementById('surfaceSelect');
     const bitrateSelect = document.getElementById('bitrateSelect');
     const degradationSelect = document.getElementById('degradationSelect');
-    const codecSelect = document.getElementById('codecSelect');
 
     const statRes = document.getElementById('statRes');
     const statFps = document.getElementById('statFps');
     const statVideoBitrate = document.getElementById('statVideoBitrate');
-    const statCodec = document.getElementById('statCodec');
+    const statAudioState = document.getElementById('statAudioState');
 
     let peer = null;
     let localStream = null;
-    let extraAudioStream = null;
-    // Mapa de espectadores activos: peerId -> { call, pc, lastBytes, lastTimestamp }
-    const activeViewers = new Map();
+    let extraAudioRef = null;
+    let roomClosedManually = false;
 
-    // Servidores STUN públicos rápidos para conexión directa P2P
+    // Lista de todos los peerIds de espectadores que entraron a la sala
+    const knownViewerIds = new Set();
+    // Llamadas activas: viewerId -> { call, pc, lastBytes, lastTimestamp }
+    const activeViewers = new Map();
+    // Conexiones de datos activas: viewerId -> DataConnection
+    const dataConnections = new Map();
+
     const rtcConfig = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -523,72 +528,18 @@
     };
 
     /**
-     * Modifica el SDP para:
-     * 1) Forzar Audio Opus en Estéreo Real (stereo=1; sprop-stereo=1) a 510 kbps constantes (cbr=1) sin DTX.
-     * 2) Desbloquear el límite de bitrate de video de Google WebRTC (x-google-max-bitrate / start-bitrate).
-     * 3) Priorizar el códec de video elegido (VP9 / AV1 / H264).
+     * Optimización SDP Segura:
+     * Solo modifica las líneas existentes de Opus para activar Estéreo 510kbps CBR
+     * sin inyectar líneas duplicadas que rompan la negociación en Chrome/Edge.
      */
-    function enhanceSdpForLosslessStreaming(sdp) {
-      const targetBitrateKbps = Math.floor(parseInt(bitrateSelect.value, 10) / 1000);
-      const startBitrateKbps = Math.min(targetBitrateKbps, 15000);
-      const minBitrateKbps = Math.min(targetBitrateKbps, 5000);
-      const preferredCodec = codecSelect.value;
-
-      let modifiedSdp = sdp;
-
-      // 1. Maximizar fidelidad de audio Opus (510 kbps estéreo CBR, sin recorte de frecuencias)
-      modifiedSdp = modifiedSdp.replace(
-        /a=fmtp:(\d+) minptime=10;useinbandfec=1/g,
-        'a=fmtp:$1 minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1;maxaveragebitrate=510000;maxplaybackrate=48000;cbr=1;usedtx=0'
+    function enhanceSdpSafe(sdp) {
+      if (!sdp) return sdp;
+      return sdp.replace(
+        /a=fmtp:(\d+) minptime=10;useinbandfec=1([^\r\n]*)/g,
+        'a=fmtp:$1 minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1;maxaveragebitrate=510000;maxplaybackrate=48000;cbr=1;usedtx=0$2'
       );
-
-      // 2. Añadir hints de alto bitrate en los formatos de video (VP8, VP9, H264, AV1)
-      modifiedSdp = modifiedSdp.replace(
-        /a=rtpmap:(\d+) (VP9|VP8|H264|AV1)\/90000/gi,
-        (match, pt, codecName) => {
-          return `${match}\r\na=fmtp:${pt} x-google-max-bitrate=${targetBitrateKbps};x-google-min-bitrate=${minBitrateKbps};x-google-start-bitrate=${startBitrateKbps}`;
-        }
-      );
-
-      // 3. Reordenar payload types si el usuario eligió un códec preferido
-      if (preferredCodec && preferredCodec !== 'AUTO') {
-        modifiedSdp = preferVideoCodec(modifiedSdp, preferredCodec);
-      }
-
-      return modifiedSdp;
     }
 
-    function preferVideoCodec(sdp, codecName) {
-      const lines = sdp.split('\r\n');
-      const mVideoIndex = lines.findIndex(line => line.startsWith('m=video'));
-      if (mVideoIndex === -1) return sdp;
-
-      const codecRegex = new RegExp(`^a=rtpmap:(\\d+) ${codecName}\\/90000`, 'i');
-      const matchingPayloadTypes = [];
-
-      for (const line of lines) {
-        const match = line.match(codecRegex);
-        if (match) {
-          matchingPayloadTypes.push(match[1]);
-        }
-      }
-
-      if (matchingPayloadTypes.length === 0) return sdp;
-
-      const mLineParts = lines[mVideoIndex].split(' ');
-      const header = mLineParts.slice(0, 3);
-      const payloads = mLineParts.slice(3);
-
-      const prioritized = [
-        ...matchingPayloadTypes,
-        ...payloads.filter(pt => !matchingPayloadTypes.includes(pt))
-      ];
-
-      lines[mVideoIndex] = [...header, ...prioritized].join(' ');
-      return lines.join('\r\n');
-    }
-
-    // Genera un ID corto y fácil de leer
     function generateRoomId() {
       const randomPart = Math.random().toString(36).substring(2, 8);
       return `cine-${randomPart}`;
@@ -601,8 +552,12 @@
     }
 
     function initPeer(customId) {
+      roomClosedManually = false;
+      leaveRoomBtn.innerHTML = '🚪 Cerrar / Salir de Sala';
+      leaveRoomBtn.className = 'btn btn-danger';
+
       if (peer) {
-        peer.destroy();
+        try { peer.destroy(); } catch (e) {}
       }
 
       const idToUse = customId || localStorage.getItem('cinep2p_room_id') || generateRoomId();
@@ -611,7 +566,7 @@
       updateShareUrl(idToUse);
 
       statusDot.className = 'dot';
-      statusText.textContent = 'Conectando al servidor de señalización...';
+      statusText.textContent = 'Conectando sala...';
 
       peer = new Peer(idToUse, {
         config: rtcConfig,
@@ -620,13 +575,16 @@
 
       peer.on('open', (id) => {
         statusDot.className = 'dot live';
-        statusText.textContent = `Sala lista (${id})`;
+        statusText.textContent = `Sala activa (${id})`;
         roomIdInput.value = id;
         updateShareUrl(id);
       });
 
-      // Cuando un espectador se conecta y solicita el stream via conexión de datos
       peer.on('connection', (conn) => {
+        knownViewerIds.add(conn.peer);
+        dataConnections.set(conn.peer, conn);
+        updateViewerCount();
+
         conn.on('open', () => {
           if (localStream) {
             callViewer(conn.peer);
@@ -636,25 +594,76 @@
         });
 
         conn.on('data', (data) => {
-          if (data && data.type === 'REQUEST_STREAM' && localStream) {
-            callViewer(conn.peer);
+          if (!data) return;
+          if (data.type === 'REQUEST_STREAM') {
+            knownViewerIds.add(conn.peer);
+            if (localStream) {
+              callViewer(conn.peer);
+            } else {
+              conn.send({ type: 'WAITING_STREAM' });
+            }
+          } else if (data.type === 'VIEWER_LEFT') {
+            removeViewer(conn.peer);
           }
+        });
+
+        conn.on('close', () => {
+          removeViewer(conn.peer);
         });
       });
 
       peer.on('error', (err) => {
-        console.error('PeerJS Error:', err);
+        console.warn('PeerJS Warning:', err);
         if (err.type === 'unavailable-id') {
           const fallbackId = generateRoomId();
           localStorage.setItem('cinep2p_room_id', fallbackId);
           initPeer(fallbackId);
-        } else {
-          statusText.textContent = `Aviso red: ${err.type}`;
+        } else if (!roomClosedManually) {
+          statusText.textContent = `Aviso: ${err.type}`;
         }
       });
     }
 
-    // Aplicar parámetros de calidad máxima sobre los RTCRtpSender activos
+    function removeViewer(viewerId) {
+      knownViewerIds.delete(viewerId);
+      dataConnections.delete(viewerId);
+      if (activeViewers.has(viewerId)) {
+        try { activeViewers.get(viewerId).call.close(); } catch (e) {}
+        activeViewers.delete(viewerId);
+      }
+      updateViewerCount();
+    }
+
+    function leaveOrReopenRoom() {
+      if (!roomClosedManually) {
+        // Cerrar sala y detener transmisión
+        roomClosedManually = true;
+        for (const [, conn] of dataConnections) {
+          try { conn.send({ type: 'ROOM_CLOSED' }); } catch (e) {}
+        }
+        stopCapture();
+        knownViewerIds.clear();
+        dataConnections.clear();
+        activeViewers.clear();
+        updateViewerCount();
+
+        if (peer) {
+          try { peer.destroy(); } catch (e) {}
+          peer = null;
+        }
+
+        statusDot.className = 'dot';
+        statusText.textContent = 'Has salido de la sala (Cerrada)';
+        leaveRoomBtn.innerHTML = '🔄 Volver a Abrir Sala';
+        leaveRoomBtn.className = 'btn btn-success';
+      } else {
+        // Reabrir una sala nueva
+        const newId = generateRoomId();
+        localStorage.setItem('cinep2p_room_id', newId);
+        initPeer(newId);
+      }
+    }
+
     async function applySenderQualityParameters(pc) {
       if (!pc) return;
       const maxBitrate = parseInt(bitrateSelect.value, 10);
@@ -673,52 +682,43 @@
             }
             params.encodings[0].maxBitrate = maxBitrate;
             params.encodings[0].maxFramerate = 60;
-            params.encodings[0].scaleResolutionDownBy = 1.0; // Prohibido reducir escala
-            params.encodings[0].priority = 'high';
-            params.encodings[0].networkPriority = 'high';
+            params.encodings[0].scaleResolutionDownBy = 1.0;
             params.degradationPreference = degradationPreference;
             await sender.setParameters(params);
           } catch (e) {
-            console.warn('No se pudieron ajustar todos los parámetros de video:', e);
+            console.warn('Ajuste estándar de parámetros de video:', e);
           }
         }
 
         if (sender.track.kind === 'audio') {
-          sender.track.contentHint = 'music'; // Indica a WebRTC que es música/película y NO voz humana
+          sender.track.contentHint = 'music';
           try {
             const params = sender.getParameters();
             if (!params.encodings || params.encodings.length === 0) {
               params.encodings = [{}];
             }
             params.encodings[0].maxBitrate = 510000;
-            params.encodings[0].priority = 'high';
-            params.encodings[0].networkPriority = 'high';
             await sender.setParameters(params);
-          } catch (e) {
-            console.warn('No se pudieron ajustar parámetros de audio:', e);
-          }
+          } catch (e) {}
         }
       }
     }
 
-    // Llama a un espectador enviándole el stream con SDP modificado de alta calidad
     function callViewer(viewerPeerId) {
-      if (!localStream || !peer) return;
+      if (!localStream || !peer || roomClosedManually) return;
 
       if (activeViewers.has(viewerPeerId)) {
         try { activeViewers.get(viewerPeerId).call.close(); } catch (e) {}
       }
 
       const call = peer.call(viewerPeerId, localStream, {
-        sdpTransform: enhanceSdpForLosslessStreaming
+        sdpTransform: enhanceSdpSafe
       });
 
       if (!call) return;
 
-      const registerPc = () => {
-        const pc = call.peerConnection;
-        if (!pc) return;
-
+      const pc = call.peerConnection;
+      if (pc) {
         activeViewers.set(viewerPeerId, {
           call,
           pc,
@@ -727,62 +727,66 @@
         });
         updateViewerCount();
 
-        pc.addEventListener('signalingstatechange', () => {
-          if (pc.signalingState === 'stable') {
-            applySenderQualityParameters(pc);
-          }
-        });
-
         pc.addEventListener('connectionstatechange', () => {
-          if (['disconnected', 'failed', 'closed'].includes(pc.connectionState)) {
+          if (pc.connectionState === 'connected') {
+            applySenderQualityParameters(pc);
+          } else if (['failed', 'closed'].includes(pc.connectionState)) {
             activeViewers.delete(viewerPeerId);
             updateViewerCount();
-          } else if (pc.connectionState === 'connected') {
-            applySenderQualityParameters(pc);
           }
         });
 
-        setTimeout(() => applySenderQualityParameters(pc), 600);
-        setTimeout(() => applySenderQualityParameters(pc), 2000);
-      };
-
-      registerPc();
-
-      call.on('close', () => {
-        activeViewers.delete(viewerPeerId);
-        updateViewerCount();
-      });
-
-      call.on('error', () => {
-        activeViewers.delete(viewerPeerId);
-        updateViewerCount();
-      });
-    }
-
-    function updateViewerCount() {
-      const count = activeViewers.size;
-      viewerCountEl.textContent = `${count} espectador${count === 1 ? '' : 'es'} conectado${count === 1 ? '' : 's'}`;
-    }
-
-    function reconnectAllViewers() {
-      if (peer && peer._connections) {
-        for (const [peerId, conns] of Object.entries(peer._connections)) {
-          if (conns && conns.length > 0) {
-            callViewer(peerId);
-          }
-        }
+        setTimeout(() => applySenderQualityParameters(pc), 800);
+        setTimeout(() => applySenderQualityParameters(pc), 2500);
       }
     }
 
-    // Iniciar captura de Ventana de App de PC o Pantalla Completa
-    async function startCapture() {
+    function updateViewerCount() {
+      const count = Math.max(activeViewers.size, knownViewerIds.size);
+      viewerCountEl.textContent = `${count} espectador${count === 1 ? '' : 'es'}`;
+    }
+
+    function callAllKnownViewers() {
+      for (const viewerId of knownViewerIds) {
+        callViewer(viewerId);
+      }
+    }
+
+    function updateAudioUI() {
+      if (!localStream) {
+        audioStatusBanner.style.display = 'none';
+        addAudioBtn.style.display = 'none';
+        statAudioState.textContent = 'Sin señal';
+        statAudioState.style.color = 'var(--muted)';
+        return;
+      }
+
+      const hasAudio = localStream.getAudioTracks().length > 0 && localStream.getAudioTracks()[0].readyState === 'live';
+
+      if (hasAudio) {
+        audioStatusBanner.className = 'info-banner ok';
+        audioStatusBanner.innerHTML = '✅ <strong>¡Imagen + Audio Estéreo del PC activos!</strong> Se está transmitiendo tanto el video como el sonido en máxima calidad (Opus 510 kbps).';
+        audioStatusBanner.style.display = 'block';
+        addAudioBtn.style.display = 'none';
+        statAudioState.textContent = 'Estéreo 510k OK';
+        statAudioState.style.color = 'var(--success)';
+      } else {
+        audioStatusBanner.className = 'info-banner warning';
+        audioStatusBanner.innerHTML = '⚠️ <strong>Imagen activa, pero falta el Audio del PC.</strong> Windows no incluye sonido al seleccionar solo una "Ventana". Haz clic en el botón verde <strong>"🔊 Vincular Audio del Sistema"</strong> (elige la pestaña <em>Pantalla completa</em>, selecciona tu monitor y marca el interruptor <em>"Compartir audio del sistema"</em>).';
+        audioStatusBanner.style.display = 'block';
+        addAudioBtn.style.display = 'inline-flex';
+        statAudioState.textContent = 'Falta Audio PC';
+        statAudioState.style.color = 'var(--warning)';
+      }
+    }
+
+    async function startCapture(preferredSurface) {
       try {
-        const preferredSurface = surfaceSelect.value; // 'window', 'monitor' o 'browser'
-        const displayMediaOptions = {
+        const stream = await navigator.mediaDevices.getDisplayMedia({
           video: {
             displaySurface: preferredSurface,
-            width: { ideal: 3840, max: 3840 },
-            height: { ideal: 2160, max: 2160 },
+            width: { ideal: 1920, max: 3840 },
+            height: { ideal: 1080, max: 2160 },
             frameRate: { ideal: 60, max: 60 },
             cursor: 'motion'
           },
@@ -791,18 +795,13 @@
             noiseSuppression: false,
             autoGainControl: false,
             channelCount: { ideal: 2 },
-            sampleRate: { ideal: 48000 },
-            sampleSize: { ideal: 16 },
-            suppressLocalAudioPlayback: false
+            sampleRate: { ideal: 48000 }
           },
-          preferCurrentTab: false,
-          selfBrowserSurface: 'exclude',
           systemAudio: 'include',
           surfaceSwitching: 'include',
           monitorTypeSurfaces: 'include'
-        };
+        });
 
-        const stream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
         localStream = stream;
 
         const videoTrack = stream.getVideoTracks()[0];
@@ -811,7 +810,7 @@
         if (videoTrack) {
           videoTrack.contentHint = degradationSelect.value === 'maintain-resolution' ? 'detail' : 'motion';
           const settings = videoTrack.getSettings();
-          captureBadge.textContent = `${settings.width || '?'}x${settings.height || '?'} @ ${Math.round(settings.frameRate || 60)}fps`;
+          captureBadge.textContent = `${settings.width || '?'}×${settings.height || '?'} @ ${Math.round(settings.frameRate || 60)}fps`;
           captureBadge.style.color = 'var(--success)';
 
           videoTrack.onended = () => {
@@ -825,32 +824,27 @@
             await audioTrack.applyConstraints({
               echoCancellation: false,
               noiseSuppression: false,
-              autoGainControl: false,
-              channelCount: 2
+              autoGainControl: false
             });
           } catch (e) {}
-          audioAlert.style.display = 'none';
-          addAudioBtn.style.display = 'none';
-        } else {
-          // Si eligió solo una Ventana de Windows y el navegador no adjuntó el audio del sistema,
-          // ofrecemos el botón para añadir el audio del sistema y combinarlo con el video de la ventana
-          audioAlert.innerHTML = `⚠️ <strong>Estás capturando la imagen de tu App, pero Windows no incluyó el audio al elegir solo "Ventana".</strong><br/>Haz clic en el botón <strong>"🔊 Añadir Audio del PC"</strong> de abajo (y elige <em>Pantalla Completa + Compartir audio del sistema</em>) para combinar el sonido de tu PC con la imagen de tu App.`;
-          audioAlert.style.display = 'block';
-          addAudioBtn.style.display = 'inline-flex';
         }
 
-        localVideo.srcObject = stream;
+        localVideo.srcObject = localStream;
+        await localVideo.play().catch(() => {});
+
         placeholder.style.display = 'none';
-        startBtn.disabled = true;
+        startMonitorBtn.disabled = true;
+        startWindowBtn.disabled = true;
         stopBtn.disabled = false;
 
-        reconnectAllViewers();
+        updateAudioUI();
+        callAllKnownViewers();
       } catch (err) {
-        console.error('Error al capturar pantalla:', err);
+        console.warn('Captura cancelada o fallida:', err);
       }
     }
 
-    // Combina la imagen de la ventana de tu App de Pelis con el audio del sistema de Windows
+    // Une el video de la Ventana de tu App con el Audio del Sistema de Windows sin que Windows corte el audio
     async function attachSystemAudio() {
       if (!localStream) return;
       try {
@@ -868,36 +862,36 @@
         });
 
         const sysAudioTrack = sysStream.getAudioTracks()[0];
-        // Detenemos el video de la pantalla completa porque solo queremos su pista de audio del sistema
-        sysStream.getVideoTracks().forEach(t => t.stop());
 
         if (!sysAudioTrack) {
-          alert('No marcaste la casilla "Compartir audio del sistema" abajo a la izquierda al elegir tu pantalla.');
+          sysStream.getTracks().forEach(t => t.stop());
+          audioStatusBanner.className = 'info-banner warning';
+          audioStatusBanner.innerHTML = '❌ <strong>No se detectó el audio:</strong> En la ventana que se abrió tienes que elegir la pestaña <strong>"Pantalla completa"</strong>, hacer clic en tu monitor y <strong>activar abajo el botón "Compartir también el audio del sistema"</strong>.';
           return;
         }
 
-        extraAudioStream = sysStream;
+        // IMPORTANTE EN WINDOWS: NO llamamos a .stop() en el video del sistema porque Chrome Windows mata también el audio del sistema si se detiene su video asociado. Solo lo deshabilitamos (enabled = false) para que consuma 0 recursos.
+        sysStream.getVideoTracks().forEach(t => { t.enabled = false; });
+        extraAudioRef = sysStream;
+
         sysAudioTrack.contentHint = 'music';
         try {
           await sysAudioTrack.applyConstraints({
             echoCancellation: false,
             noiseSuppression: false,
-            autoGainControl: false,
-            channelCount: 2
+            autoGainControl: false
           });
         } catch (e) {}
 
-        // Eliminar pistas de audio previas si las hubiera y añadir la del sistema al stream de la ventana
-        localStream.getAudioTracks().forEach(t => localStream.removeTrack(t));
-        localStream.addTrack(sysAudioTrack);
+        // Reconstruir MediaStream limpio con el Video de tu Ventana + el Audio del Sistema
+        const currentVideoTrack = localStream.getVideoTracks()[0];
+        localStream = new MediaStream([currentVideoTrack, sysAudioTrack]);
+        localVideo.srcObject = localStream;
 
-        audioAlert.style.display = 'none';
-        addAudioBtn.style.display = 'none';
-
-        // Re-llamar a los espectadores con el stream que ahora tiene Video de tu App + Audio del Sistema
-        reconnectAllViewers();
+        updateAudioUI();
+        callAllKnownViewers();
       } catch (e) {
-        console.warn('Cancelado añadir audio del sistema:', e);
+        console.warn('Se canceló vincular audio del sistema:', e);
       }
     }
 
@@ -906,31 +900,35 @@
         localStream.getTracks().forEach(t => t.stop());
         localStream = null;
       }
-      if (extraAudioStream) {
-        extraAudioStream.getTracks().forEach(t => t.stop());
-        extraAudioStream = null;
+      if (extraAudioRef) {
+        extraAudioRef.getTracks().forEach(t => t.stop());
+        extraAudioRef = null;
       }
       localVideo.srcObject = null;
       placeholder.style.display = 'block';
-      audioAlert.style.display = 'none';
-      addAudioBtn.style.display = 'none';
-      startBtn.disabled = false;
+      startMonitorBtn.disabled = false;
+      startWindowBtn.disabled = false;
       stopBtn.disabled = true;
       captureBadge.textContent = 'Sin señal';
       captureBadge.style.color = 'var(--muted)';
+
+      updateAudioUI();
 
       for (const [, viewer] of activeViewers) {
         try { viewer.call.close(); } catch (e) {}
       }
       activeViewers.clear();
-      updateViewerCount();
+
+      for (const [, conn] of dataConnections) {
+        try { conn.send({ type: 'STREAM_STOPPED' }); } catch (e) {}
+      }
 
       statRes.textContent = '—';
       statFps.textContent = '—';
       statVideoBitrate.textContent = '0.0 Mbps';
     }
 
-    // Telemetría en tiempo real cada segundo
+    // Telemetría cada segundo
     setInterval(async () => {
       if (!localStream) return;
 
@@ -940,9 +938,6 @@
         if (s.width && s.height) {
           statRes.textContent = `${s.width}×${s.height}`;
         }
-        if (s.frameRate) {
-          statFps.textContent = `${Math.round(s.frameRate)} FPS`;
-        }
       }
 
       if (activeViewers.size === 0) {
@@ -950,7 +945,6 @@
         return;
       }
 
-      // Medir el primer espectador activo
       const firstViewer = activeViewers.values().next().value;
       if (!firstViewer || !firstViewer.pc) return;
 
@@ -976,21 +970,21 @@
             }
             if (report.framesPerSecond !== undefined) {
               statFps.textContent = `${Math.round(report.framesPerSecond)} FPS`;
+              if (report.framesPerSecond === 0) {
+                statFps.textContent = '0 FPS (¡No minimices la App!)';
+              }
             }
-          }
-
-          if (report.type === 'codec' && report.mimeType && report.mimeType.startsWith('video/')) {
-            const codecShort = report.mimeType.split('/')[1];
-            statCodec.textContent = `${codecShort} + Opus 510k`;
           }
         });
       } catch (e) {}
     }, 1000);
 
     // Eventos UI
-    startBtn.addEventListener('click', startCapture);
+    startMonitorBtn.addEventListener('click', () => startCapture('monitor'));
+    startWindowBtn.addEventListener('click', () => startCapture('window'));
     addAudioBtn.addEventListener('click', attachSystemAudio);
     stopBtn.addEventListener('click', stopCapture);
+    leaveRoomBtn.addEventListener('click', leaveOrReopenRoom);
 
     copyBtn.addEventListener('click', async () => {
       try {
@@ -1007,7 +1001,14 @@
     applyRoomBtn.addEventListener('click', () => {
       const cleanId = roomIdInput.value.trim().replace(/[^a-zA-Z0-9_-]/g, '-');
       if (cleanId) {
+        knownViewerIds.clear();
+        activeViewers.clear();
+        dataConnections.clear();
         initPeer(cleanId);
+        if (localStream) {
+          // Si ya estaba capturando pantalla cuando cambió el nombre de sala, mantiene la captura lista
+          updateAudioUI();
+        }
       }
     });
 
@@ -1023,7 +1024,6 @@
       }
     });
 
-    // Inicializar al abrir la página
     initPeer();
   </script>
 </body>
