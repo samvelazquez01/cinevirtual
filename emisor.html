@@ -350,7 +350,10 @@
       <div class="controls-bar">
         <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
           <button id="startBtn" class="btn btn-primary">
-            <span>🖥️ Capturar Ventana / Pestaña</span>
+            <span>🖥️ Capturar App de PC / Pantalla</span>
+          </button>
+          <button id="addAudioBtn" class="btn btn-secondary" style="display: none;" title="Si capturaste solo una Ventana y Windows no te dejó marcar audio, pulsa aquí para capturar el audio del sistema">
+            <span>🔊 Añadir Audio del PC</span>
           </button>
           <button id="stopBtn" class="btn btn-danger" disabled>
             <span>⏹️ Detener Transmisión</span>
@@ -401,6 +404,15 @@
         </div>
 
         <div class="form-group">
+          <label><span>¿Qué vas a capturar de tu PC?</span></label>
+          <select id="surfaceSelect">
+            <option value="window" selected>🪟 Ventana de App de Películas (VLC, Stremio, Kodi, App PC)</option>
+            <option value="monitor">🖥️ Pantalla Completa (Incluye Video de tu App + Audio del Sistema en 1 paso)</option>
+            <option value="browser">🌐 Pestaña del Navegador</option>
+          </select>
+        </div>
+
+        <div class="form-group">
           <label>
             <span>Bitrate Máximo de Video</span>
             <span style="color: var(--accent);">En vivo</span>
@@ -433,7 +445,9 @@
         </div>
 
         <div class="tip-box">
-          💡 <strong>Tip para Películas:</strong> Si reproduces la película en una pestaña de Chrome/Edge (o abres un archivo <code>.mp4/.mkv</code> arrastrándolo a una pestaña del navegador), elige <strong>"Pestaña de Chrome"</strong> al capturar: el audio se captura directo en digital 100% puro y sin ruidos de tu PC.
+          💡 <strong>Cómo capturar tu App de Películas con Audio en Windows:</strong><br/>
+          • <strong>Opción A (Más fácil):</strong> En la ventana que se abre arriba, haz clic en la pestaña <strong>"Pantalla completa"</strong>, selecciona tu monitor, marca abajo <strong>"Compartir audio del sistema"</strong> y pon tu app de pelis en grande.<br/>
+          • <strong>Opción B (Solo la ventana de la App):</strong> Elige la pestaña <strong>"Ventana"</strong> → tu App de Pelis. Y si necesitas el sonido, pulsa el botón <strong>"🔊 Añadir Audio del PC"</strong> que aparecerá al lado.
         </div>
       </div>
 
@@ -469,6 +483,7 @@
     const localVideo = document.getElementById('localVideo');
     const placeholder = document.getElementById('placeholder');
     const startBtn = document.getElementById('startBtn');
+    const addAudioBtn = document.getElementById('addAudioBtn');
     const stopBtn = document.getElementById('stopBtn');
     const statusDot = document.getElementById('statusDot');
     const statusText = document.getElementById('statusText');
@@ -480,6 +495,7 @@
     const captureBadge = document.getElementById('captureBadge');
     const audioAlert = document.getElementById('audioAlert');
 
+    const surfaceSelect = document.getElementById('surfaceSelect');
     const bitrateSelect = document.getElementById('bitrateSelect');
     const degradationSelect = document.getElementById('degradationSelect');
     const codecSelect = document.getElementById('codecSelect');
@@ -491,10 +507,11 @@
 
     let peer = null;
     let localStream = null;
+    let extraAudioStream = null;
     // Mapa de espectadores activos: peerId -> { call, pc, lastBytes, lastTimestamp }
     const activeViewers = new Map();
 
-    //Servidores STUN públicos rápidos para conexión directa P2P
+    // Servidores STUN públicos rápidos para conexión directa P2P
     const rtcConfig = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -648,7 +665,6 @@
         if (!sender.track) continue;
 
         if (sender.track.kind === 'video') {
-          // ContentHint detail/motion para evitar suavizado excesivo
           sender.track.contentHint = degradationPreference === 'maintain-resolution' ? 'detail' : 'motion';
           try {
             const params = sender.getParameters();
@@ -689,7 +705,6 @@
     function callViewer(viewerPeerId) {
       if (!localStream || !peer) return;
 
-      // Si ya había una llamada previa con ese espectador, cerrarla limpiamente
       if (activeViewers.has(viewerPeerId)) {
         try { activeViewers.get(viewerPeerId).call.close(); } catch (e) {}
       }
@@ -712,7 +727,6 @@
         });
         updateViewerCount();
 
-        // Aplicar bitrate y bloqueo de resolución en cuanto el canal se negocie
         pc.addEventListener('signalingstatechange', () => {
           if (pc.signalingState === 'stable') {
             applySenderQualityParameters(pc);
@@ -750,12 +764,23 @@
       viewerCountEl.textContent = `${count} espectador${count === 1 ? '' : 'es'} conectado${count === 1 ? '' : 's'}`;
     }
 
-    // Iniciar captura de pantalla/ventana/pestaña sin filtros de pérdida
+    function reconnectAllViewers() {
+      if (peer && peer._connections) {
+        for (const [peerId, conns] of Object.entries(peer._connections)) {
+          if (conns && conns.length > 0) {
+            callViewer(peerId);
+          }
+        }
+      }
+    }
+
+    // Iniciar captura de Ventana de App de PC o Pantalla Completa
     async function startCapture() {
       try {
+        const preferredSurface = surfaceSelect.value; // 'window', 'monitor' o 'browser'
         const displayMediaOptions = {
           video: {
-            displaySurface: 'browser',
+            displaySurface: preferredSurface,
             width: { ideal: 3840, max: 3840 },
             height: { ideal: 2160, max: 2160 },
             frameRate: { ideal: 60, max: 60 },
@@ -773,13 +798,13 @@
           preferCurrentTab: false,
           selfBrowserSurface: 'exclude',
           systemAudio: 'include',
-          surfaceSwitching: 'include'
+          surfaceSwitching: 'include',
+          monitorTypeSurfaces: 'include'
         };
 
         const stream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
         localStream = stream;
 
-        // Configurar tracks para máxima fidelidad
         const videoTrack = stream.getVideoTracks()[0];
         const audioTrack = stream.getAudioTracks()[0];
 
@@ -796,7 +821,6 @@
 
         if (audioTrack) {
           audioTrack.contentHint = 'music';
-          // Asegurar que ningún filtro de voz quede activo si el navegador lo soporta
           try {
             await audioTrack.applyConstraints({
               echoCancellation: false,
@@ -806,8 +830,13 @@
             });
           } catch (e) {}
           audioAlert.style.display = 'none';
+          addAudioBtn.style.display = 'none';
         } else {
+          // Si eligió solo una Ventana de Windows y el navegador no adjuntó el audio del sistema,
+          // ofrecemos el botón para añadir el audio del sistema y combinarlo con el video de la ventana
+          audioAlert.innerHTML = `⚠️ <strong>Estás capturando la imagen de tu App, pero Windows no incluyó el audio al elegir solo "Ventana".</strong><br/>Haz clic en el botón <strong>"🔊 Añadir Audio del PC"</strong> de abajo (y elige <em>Pantalla Completa + Compartir audio del sistema</em>) para combinar el sonido de tu PC con la imagen de tu App.`;
           audioAlert.style.display = 'block';
+          addAudioBtn.style.display = 'inline-flex';
         }
 
         localVideo.srcObject = stream;
@@ -815,16 +844,60 @@
         startBtn.disabled = true;
         stopBtn.disabled = false;
 
-        // Si ya había espectadores esperando en la sala, llamarlos inmediatamente
-        if (peer && peer._connections) {
-          for (const [peerId, conns] of Object.entries(peer._connections)) {
-            if (conns && conns.length > 0) {
-              callViewer(peerId);
-            }
-          }
-        }
+        reconnectAllViewers();
       } catch (err) {
         console.error('Error al capturar pantalla:', err);
+      }
+    }
+
+    // Combina la imagen de la ventana de tu App de Pelis con el audio del sistema de Windows
+    async function attachSystemAudio() {
+      if (!localStream) return;
+      try {
+        const sysStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { displaySurface: 'monitor' },
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+            channelCount: { ideal: 2 },
+            sampleRate: { ideal: 48000 }
+          },
+          systemAudio: 'include',
+          monitorTypeSurfaces: 'include'
+        });
+
+        const sysAudioTrack = sysStream.getAudioTracks()[0];
+        // Detenemos el video de la pantalla completa porque solo queremos su pista de audio del sistema
+        sysStream.getVideoTracks().forEach(t => t.stop());
+
+        if (!sysAudioTrack) {
+          alert('No marcaste la casilla "Compartir audio del sistema" abajo a la izquierda al elegir tu pantalla.');
+          return;
+        }
+
+        extraAudioStream = sysStream;
+        sysAudioTrack.contentHint = 'music';
+        try {
+          await sysAudioTrack.applyConstraints({
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+            channelCount: 2
+          });
+        } catch (e) {}
+
+        // Eliminar pistas de audio previas si las hubiera y añadir la del sistema al stream de la ventana
+        localStream.getAudioTracks().forEach(t => localStream.removeTrack(t));
+        localStream.addTrack(sysAudioTrack);
+
+        audioAlert.style.display = 'none';
+        addAudioBtn.style.display = 'none';
+
+        // Re-llamar a los espectadores con el stream que ahora tiene Video de tu App + Audio del Sistema
+        reconnectAllViewers();
+      } catch (e) {
+        console.warn('Cancelado añadir audio del sistema:', e);
       }
     }
 
@@ -833,9 +906,14 @@
         localStream.getTracks().forEach(t => t.stop());
         localStream = null;
       }
+      if (extraAudioStream) {
+        extraAudioStream.getTracks().forEach(t => t.stop());
+        extraAudioStream = null;
+      }
       localVideo.srcObject = null;
       placeholder.style.display = 'block';
       audioAlert.style.display = 'none';
+      addAudioBtn.style.display = 'none';
       startBtn.disabled = false;
       stopBtn.disabled = true;
       captureBadge.textContent = 'Sin señal';
@@ -911,6 +989,7 @@
 
     // Eventos UI
     startBtn.addEventListener('click', startCapture);
+    addAudioBtn.addEventListener('click', attachSystemAudio);
     stopBtn.addEventListener('click', stopCapture);
 
     copyBtn.addEventListener('click', async () => {
