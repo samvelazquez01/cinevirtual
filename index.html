@@ -662,7 +662,8 @@
         retryTimer = setInterval(() => {
           if (!hasReceivedFrames && peer && !peer.destroyed) {
             const pcState = currentCall && currentCall.peerConnection ? currentCall.peerConnection.connectionState : 'none';
-            const stale = Date.now() - callStartedAt > 30000;
+            const stale = callStartedAt > 0 && Date.now() - callStartedAt > 14000;
+            if (stale && rtcConfig.iceTransportPolicy !== 'relay') { rtcConfig.iceTransportPolicy = 'relay'; dlog('Sin conexión en 14s: reintentando SOLO por relay TURN'); }
             if (pcState === 'failed' || pcState === 'disconnected' || pcState === 'closed' || pcState === 'none' || stale) {
               try { if (currentCall) currentCall.close(); } catch (e) {}
               currentCall = null;
@@ -1001,6 +1002,18 @@
       pc.addEventListener('icecandidateerror', e => dlog(label + ' ICE error ' + e.errorCode + ' ' + (e.url || '') + ' ' + (e.errorText || '')));
       pc.addEventListener('iceconnectionstatechange', () => dlog(label + ' ice=' + pc.iceConnectionState));
       pc.addEventListener('connectionstatechange', () => dlog(label + ' conn=' + pc.connectionState));
+      setTimeout(async () => {
+        if (['connected', 'completed', 'closed'].includes(pc.iceConnectionState)) return;
+        try {
+          const st = await pc.getStats(); const loc = {}, rem = {}, pairs = {};
+          st.forEach(r => {
+            if (r.type === 'local-candidate') loc[r.candidateType] = (loc[r.candidateType] || 0) + 1;
+            if (r.type === 'remote-candidate') rem[r.candidateType] = (rem[r.candidateType] || 0) + 1;
+            if (r.type === 'candidate-pair') pairs[r.state] = (pairs[r.state] || 0) + 1;
+          });
+          dlog(label + ' a los 8s: locales ' + JSON.stringify(loc) + ' remotos ' + JSON.stringify(rem) + ' pares ' + JSON.stringify(pairs));
+        } catch (e) {}
+      }, 8000);
     }
     async function testTurn(label) {
       dlog(label + 'probando TURN (solo relay)...');
