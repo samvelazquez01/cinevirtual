@@ -428,6 +428,7 @@
     let dummyViewerStream = null;
     let hasReceivedFrames = false;
     let isAttemptingCall = false;
+    let callStartedAt = 0;
 
     let lastVideoBytes = 0;
     let lastAudioBytes = 0;
@@ -437,50 +438,35 @@
     const rtcConfig = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun.cloudflare.com:3478' },
-        {
-          urls: [
-            'turn:a.relay.metered.ca:80',
-            'turn:a.relay.metered.ca:80?transport=tcp',
-            'turn:a.relay.metered.ca:443',
-            'turn:a.relay.metered.ca:443?transport=tcp',
-            'turns:a.relay.metered.ca:443?transport=tcp'
-          ],
-          username: 'e8dd65c92f611c4086f8fc20',
-          credential: '2/3+R/aH1h2N+N9Y'
-        },
-        {
-          urls: [
-            'turn:openrelay.metered.ca:80',
-            'turn:openrelay.metered.ca:80?transport=tcp',
-            'turn:openrelay.metered.ca:443',
-            'turn:openrelay.metered.ca:443?transport=tcp',
-            'turns:openrelay.metered.ca:443?transport=tcp'
-          ],
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: [
-            'turn:standard.relay.metered.ca:80',
-            'turn:standard.relay.metered.ca:80?transport=tcp',
-            'turn:standard.relay.metered.ca:443',
-            'turn:standard.relay.metered.ca:443?transport=tcp',
-            'turns:standard.relay.metered.ca:443?transport=tcp'
-          ],
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        }
+        { urls: 'stun:stun.relay.metered.ca:80' },
+        { urls: 'turn:global.relay.metered.ca:80', username: '0fbef837c9a591b641b5bc61', credential: 'hzp0YU55SlDsgtOd' },
+        { urls: 'turn:global.relay.metered.ca:80?transport=tcp', username: '0fbef837c9a591b641b5bc61', credential: 'hzp0YU55SlDsgtOd' },
+        { urls: 'turn:global.relay.metered.ca:443', username: '0fbef837c9a591b641b5bc61', credential: 'hzp0YU55SlDsgtOd' },
+        { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: '0fbef837c9a591b641b5bc61', credential: 'hzp0YU55SlDsgtOd' },
       ],
-      iceCandidatePoolSize: 10
+      iceCandidatePoolSize: 0
     };
+
+    // ===== TURN GRATIS (Metered Open Relay, 20 GB/mes) =====
+    // Pega aqui tu URL: https://TUAPP.metered.live/api/v1/turn/credentials?apiKey=TU_API_KEY
+    const TURN_API_URL = '';
+    const rtcConfigReady = (async () => {
+      if (!TURN_API_URL) { return; }
+      try {
+        const r = await fetch(TURN_API_URL);
+        const list = await r.json();
+        if (Array.isArray(list) && list.length) {
+          rtcConfig.iceServers = [{ urls: 'stun:stun.l.google.com:19302' }, ...list];
+          console.info('[CineP2P] Servidores ICE cargados:', list.length);
+        }
+      } catch (e) { console.warn('[CineP2P] No se pudo cargar TURN:', e); }
+    })();
 
     function enhanceAnswerSdp(sdp) {
       if (!sdp) return sdp;
       return sdp.replace(
         /a=fmtp:(\d+) minptime=10;useinbandfec=1([^\r\n]*)/g,
-        'a=fmtp:$1 minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1;maxaveragebitrate=320000;maxplaybackrate=48000;cbr=1;usedtx=0$2'
+        'a=fmtp:$1 minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1;maxaveragebitrate=192000;maxplaybackrate=48000;cbr=1;usedtx=0$2'
       );
     }
 
@@ -605,9 +591,12 @@
       // Si ya hay una llamada negociando candidatos ICE entre países, NO crear otra encima hasta que pasen 12 segundos o falle
       if (currentCall && currentCall.peerConnection) {
         const state = currentCall.peerConnection.connectionState;
-        if (state === 'connecting' || state === 'connected') {
+        const age = Date.now() - callStartedAt;
+        if (state === 'connected' || ((state === 'new' || state === 'connecting') && age < 30000)) {
           return;
         }
+        try { currentCall.close(); } catch (e) {}
+        currentCall = null;
       }
 
       try {
@@ -619,6 +608,7 @@
         if (!outboundCall) return;
 
         currentCall = outboundCall;
+        callStartedAt = Date.now();
         outboundCall.on('stream', (remoteStream) => {
           handleIncomingRemoteStream(remoteStream, outboundCall);
         });
@@ -627,7 +617,7 @@
       }
     }
 
-    function connectToBroadcaster(roomId) {
+    async function connectToBroadcaster(roomId) {
       if (!roomId) return;
       clearInterval(retryTimer);
       hasReceivedFrames = false;
@@ -650,6 +640,7 @@
         try { peer.destroy(); } catch (e) {}
       }
 
+      await rtcConfigReady;
       peer = new Peer({
         config: rtcConfig,
         debug: 1
@@ -664,7 +655,9 @@
         retryTimer = setInterval(() => {
           if (!hasReceivedFrames && peer && !peer.destroyed) {
             const pcState = currentCall && currentCall.peerConnection ? currentCall.peerConnection.connectionState : 'none';
-            if (pcState === 'failed' || pcState === 'disconnected' || pcState === 'closed' || pcState === 'none') {
+            const stale = Date.now() - callStartedAt > 30000;
+            if (pcState === 'failed' || pcState === 'disconnected' || pcState === 'closed' || pcState === 'none' || stale) {
+              try { if (currentCall) currentCall.close(); } catch (e) {}
               currentCall = null;
               if (dataConn && dataConn.open) {
                 dataConn.send({ type: 'REQUEST_STREAM' });
@@ -695,6 +688,8 @@
         });
       });
 
+      peer.on('disconnected', () => { if (peer && !peer.destroyed) { try { peer.reconnect(); } catch (e) {} } });
+
       peer.on('error', (err) => {
         console.warn('Error Peer:', err);
         if (!hasReceivedFrames) {
@@ -702,13 +697,15 @@
           statusLabel.textContent = 'Esperando señal...';
           connectCard.style.display = 'flex';
           cardTitle.textContent = 'Conectando con el Emisor...';
-          cardDesc.textContent = `Sala "${targetRoomId}". Verifica que el emisor tenga activa la transmisión.`;
+          cardDesc.textContent = `Sala "${targetRoomId}". Verifica que el emisor tenga activa la transmisión. (${err.type})`;
         }
       });
     }
 
     function openDataChannel() {
       if (!peer || !targetRoomId) return;
+      if (dataConn && dataConn.open) return;
+      if (dataConn) { try { dataConn.close(); } catch (e) {} }
 
       try {
         dataConn = peer.connect(targetRoomId, { reliable: true });
@@ -734,6 +731,10 @@
             connectCard.style.display = 'flex';
             cardTitle.textContent = 'Captura en pausa';
             cardDesc.textContent = 'El emisor detuvo la captura temporalmente.';
+          } else if (data.type === 'PAUSED') {
+            showPauseToast('⏸ El emisor pausó la película');
+          } else if (data.type === 'PLAYING') {
+            showPauseToast('');
           } else if (data.type === 'ROOM_CLOSED') {
             leaveRoom();
             cardTitle.textContent = 'El emisor cerró la sala';
@@ -950,14 +951,28 @@
             lastAudioBytes = bytes;
           }
 
-          if (report.type === 'candidate-pair' && report.state === 'succeeded' && report.currentRoundTripTime !== undefined) {
-            statPing.textContent = `${Math.round(report.currentRoundTripTime * 1000)} ms`;
+          if (report.type === 'candidate-pair' && report.state === 'succeeded' && report.nominated && report.currentRoundTripTime !== undefined) {
+            const lc = stats.get(report.localCandidateId), rc = stats.get(report.remoteCandidateId);
+            const relayed = (lc && lc.candidateType === 'relay') || (rc && rc.candidateType === 'relay');
+            statPing.textContent = `${Math.round(report.currentRoundTripTime * 1000)} ms · ${relayed ? 'Relay TURN' : 'Directo'}`;
           }
         });
 
         lastStatsTime = now;
       } catch (e) {}
     }, 1000);
+
+    // Evitar que el celular se apague durante la película
+    let wakeLock = null;
+    async function requestWakeLock() { try { if ('wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } } catch (e) {} }
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && hasReceivedFrames) requestWakeLock(); });
+    remoteVideo.addEventListener('loadeddata', requestWakeLock);
+
+    // Aviso cuando el emisor pausa
+    const pauseToast = document.createElement('div');
+    pauseToast.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:24;background:rgba(0,0,0,.75);color:#fff;padding:.8rem 1.4rem;border-radius:999px;font-weight:700;display:none;';
+    stage.appendChild(pauseToast);
+    function showPauseToast(t) { pauseToast.textContent = t; pauseToast.style.display = t ? 'block' : 'none'; }
 
     // Leer automáticamente ?sala=... de la URL al abrir el enlace
     window.addEventListener('DOMContentLoaded', () => {
