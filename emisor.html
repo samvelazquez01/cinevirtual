@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CineP2P — Panel de Emisor (Calidad Master)</title>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b0d12;
+      --panel: #131722;
+      --panel-border: #22293a;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 1rem 2rem;
+      background: rgba(19, 23, 34, 0.85);
+      border-bottom: 1px solid var(--panel-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      backdrop-filter: blur(12px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 700;
+      font-size: 1.25rem;
+      letter-spacing: -0.02em;
+    }
+
+    .badge-pro {
+      background: linear-gradient(135deg, #6366f1, #a855f7);
+      font-size: 0.7rem;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      padding: 0.4rem 0.85rem;
+      border-radius: 999px;
+      background: #1e2436;
+      border: 1px solid var(--panel-border);
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+
+    .dot.live {
+      background: var(--success);
+      box-shadow: 0 0 10px var(--success);
+      animation: pulse 1.8s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.45; }
+    }
+
+    main {
+      flex: 1;
+      max-width: 1440px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 1.5rem 2rem;
+      display: grid;
+      grid-template-columns: 1fr 400px;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 1050px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .card-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .preview-container {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #050608;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--panel-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .preview-placeholder {
+      text-align: center;
+      color: var(--muted);
+      padding: 2rem;
+      max-width: 460px;
+    }
+
+    .preview-placeholder svg {
+      width: 52px;
+      height: 52px;
+      margin-bottom: 0.8rem;
+      stroke: var(--accent);
+      opacity: 0.85;
+    }
+
+    .controls-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.7rem 1.25rem;
+      border-radius: 9px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      color: white;
+    }
+
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+
+    .btn-danger {
+      background: var(--danger);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: #dc2626;
+    }
+
+    .btn-secondary {
+      background: #1e2638;
+      border: 1px solid var(--panel-border);
+      color: var(--text);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #283249;
+    }
+
+    .link-box {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    input, select {
+      width: 100%;
+      background: #0b0e17;
+      border: 1px solid var(--panel-border);
+      color: var(--text);
+      padding: 0.65rem 0.85rem;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      outline: none;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--accent);
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .form-group label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-weight: 500;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.65rem;
+    }
+
+    .stat-item {
+      background: #0b0e17;
+      border: 1px solid var(--panel-border);
+      padding: 0.75rem;
+      border-radius: 8px;
+    }
+
+    .stat-label {
+      font-size: 0.73rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .stat-value {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-top: 0.2rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .audio-warning {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      color: #fcd34d;
+      padding: 0.75rem;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      line-height: 1.4;
+      display: none;
+    }
+
+    .tip-box {
+      background: rgba(99, 102, 241, 0.08);
+      border: 1px solid rgba(99, 102, 241, 0.25);
+      border-radius: 8px;
+      padding: 0.85rem;
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      line-height: 1.45;
+    }
+
+    .tip-box strong {
+      color: #818cf8;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <span>🎬 CineP2P Emisor</span>
+      <span class="badge-pro">RAW / High-Bitrate WebRTC</span>
+    </div>
+    <div class="status-pill">
+      <div id="statusDot" class="dot"></div>
+      <span id="statusText">Inicializando red P2P...</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Columna Izquierda: Vista previa y Controles -->
+    <div class="card">
+      <div class="card-title">
+        <span>Vista Previa de Captura (Local Silenciada para evitar eco)</span>
+        <span id="captureBadge" style="font-size: 0.8rem; color: var(--muted);">Sin señal</span>
+      </div>
+
+      <div class="preview-container">
+        <video id="localVideo" autoplay playsinline muted></video>
+        <div id="placeholder" class="preview-placeholder">
+          <svg fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 20.25h12m-7.5-3v3m3-3v3m-10.125-3h17.25c.621 0 1.125-.504 1.125-1.125V4.875c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125z" />
+          </svg>
+          <h3 style="color: var(--text); margin-bottom: 0.4rem;">Listo para transmitir en calidad original</h3>
+          <p style="font-size: 0.88rem; line-height: 1.45;">
+            Haz clic en <strong>Capturar Ventana / Pestaña</strong>. Asegúrate de marcar la casilla <strong>"Compartir también el audio de la pestaña / sistema"</strong> en la ventana emergente del navegador.
+          </p>
+        </div>
+      </div>
+
+      <div id="audioAlert" class="audio-warning">
+        ⚠️ <strong>Atención:</strong> Estás compartiendo imagen pero <strong>NO se detectó pista de audio</strong>. Si quieres que la otra persona escuche la película, detén la captura, vuelve a elegir la pestaña/pantalla y activa la casilla <em>"Compartir audio"</em> abajo a la izquierda.
+      </div>
+
+      <div class="controls-bar">
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+          <button id="startBtn" class="btn btn-primary">
+            <span>🖥️ Capturar Ventana / Pestaña</span>
+          </button>
+          <button id="stopBtn" class="btn btn-danger" disabled>
+            <span>⏹️ Detener Transmisión</span>
+          </button>
+        </div>
+        <span style="font-size: 0.8rem; color: var(--muted);">
+          Audio: <strong>Opus 510 kbps Estéreo CBR</strong> (Sin compresión de voz)
+        </span>
+      </div>
+    </div>
+
+    <!-- Columna Derecha: Enlace, Ajustes de Calidad y Telemetría -->
+    <div class="sidebar">
+      <!-- Enlace para compartir -->
+      <div class="card">
+        <div class="card-title">
+          <span>🔗 Enlace para el Espectador</span>
+          <span id="viewerCount" style="font-size: 0.8rem; color: var(--success);">0 conectados</span>
+        </div>
+
+        <div class="form-group">
+          <label>
+            <span>Código de Sala (Opcional, puedes personalizarlo)</span>
+          </label>
+          <div class="link-box">
+            <input type="text" id="roomIdInput" placeholder="Generando..." />
+            <button id="applyRoomBtn" class="btn btn-secondary" style="padding: 0.6rem 0.9rem;" title="Cambiar ID de sala">
+              Aplicar
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label><span>Enlace directo (Pásale este link a la otra persona)</span></label>
+          <div class="link-box">
+            <input type="text" id="shareUrlInput" readonly />
+            <button id="copyBtn" class="btn btn-primary" style="white-space: nowrap;">
+              📋 Copiar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Configuración de Calidad Ultra -->
+      <div class="card">
+        <div class="card-title">
+          <span>⚙️ Parámetros de Calidad Sin Pérdidas</span>
+        </div>
+
+        <div class="form-group">
+          <label>
+            <span>Bitrate Máximo de Video</span>
+            <span style="color: var(--accent);">En vivo</span>
+          </label>
+          <select id="bitrateSelect">
+            <option value="50000000">50 Mbps — Ultra Master / 4K (Fibra Simétrica)</option>
+            <option value="25000000" selected>25 Mbps — Blu-Ray 1080p60 Sin Pérdidas (Recomendado)</option>
+            <option value="15000000">15 Mbps — Alta Definición 1080p60 Fluido</option>
+            <option value="8000000">8 Mbps — Conexión Estándar Estabilizada</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label><span>Prioridad del Codificador WebRTC</span></label>
+          <select id="degradationSelect">
+            <option value="maintain-resolution" selected>Mantener Resolución 1:1 (Prohibir que se vea borroso)</option>
+            <option value="maintain-framerate">Priorizar 60 FPS constantes (Fluidez máxima)</option>
+            <option value="balanced">Equilibrado</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label><span>Códec de Video Preferido</span></label>
+          <select id="codecSelect">
+            <option value="VP9" selected>VP9 (Mayor nitidez y color a alto bitrate)</option>
+            <option value="AV1">AV1 (Última generación si tu GPU lo soporta)</option>
+            <option value="H264">H.264 (Aceleración por Hardware rápida / Bajo uso CPU)</option>
+            <option value="AUTO">Automático del Navegador</option>
+          </select>
+        </div>
+
+        <div class="tip-box">
+          💡 <strong>Tip para Películas:</strong> Si reproduces la película en una pestaña de Chrome/Edge (o abres un archivo <code>.mp4/.mkv</code> arrastrándolo a una pestaña del navegador), elige <strong>"Pestaña de Chrome"</strong> al capturar: el audio se captura directo en digital 100% puro y sin ruidos de tu PC.
+        </div>
+      </div>
+
+      <!-- Monitor de Telemetría en Tiempo Real -->
+      <div class="card">
+        <div class="card-title">
+          <span>📊 Monitor de Transmisión en Tiempo Real</span>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-label">Resolución Enviada</div>
+            <div class="stat-value" id="statRes">—</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Fotogramas / seg</div>
+            <div class="stat-value" id="statFps">—</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Bitrate Video</div>
+            <div class="stat-value" id="statVideoBitrate">0.0 Mbps</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Audio / Códec</div>
+            <div class="stat-value" id="statCodec">Estéreo 510k</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Elementos UI
+    const localVideo = document.getElementById('localVideo');
+    const placeholder = document.getElementById('placeholder');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const roomIdInput = document.getElementById('roomIdInput');
+    const applyRoomBtn = document.getElementById('applyRoomBtn');
+    const shareUrlInput = document.getElementById('shareUrlInput');
+    const copyBtn = document.getElementById('copyBtn');
+    const viewerCountEl = document.getElementById('viewerCount');
+    const captureBadge = document.getElementById('captureBadge');
+    const audioAlert = document.getElementById('audioAlert');
+
+    const bitrateSelect = document.getElementById('bitrateSelect');
+    const degradationSelect = document.getElementById('degradationSelect');
+    const codecSelect = document.getElementById('codecSelect');
+
+    const statRes = document.getElementById('statRes');
+    const statFps = document.getElementById('statFps');
+    const statVideoBitrate = document.getElementById('statVideoBitrate');
+    const statCodec = document.getElementById('statCodec');
+
+    let peer = null;
+    let localStream = null;
+    // Mapa de espectadores activos: peerId -> { call, pc, lastBytes, lastTimestamp }
+    const activeViewers = new Map();
+
+    //Servidores STUN públicos rápidos para conexión directa P2P
+    const rtcConfig = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun.cloudflare.com:3478' }
+      ],
+      sdpSemantics: 'unified-plan'
+    };
+
+    /**
+     * Modifica el SDP para:
+     * 1) Forzar Audio Opus en Estéreo Real (stereo=1; sprop-stereo=1) a 510 kbps constantes (cbr=1) sin DTX.
+     * 2) Desbloquear el límite de bitrate de video de Google WebRTC (x-google-max-bitrate / start-bitrate).
+     * 3) Priorizar el códec de video elegido (VP9 / AV1 / H264).
+     */
+    function enhanceSdpForLosslessStreaming(sdp) {
+      const targetBitrateKbps = Math.floor(parseInt(bitrateSelect.value, 10) / 1000);
+      const startBitrateKbps = Math.min(targetBitrateKbps, 15000);
+      const minBitrateKbps = Math.min(targetBitrateKbps, 5000);
+      const preferredCodec = codecSelect.value;
+
+      let modifiedSdp = sdp;
+
+      // 1. Maximizar fidelidad de audio Opus (510 kbps estéreo CBR, sin recorte de frecuencias)
+      modifiedSdp = modifiedSdp.replace(
+        /a=fmtp:(\d+) minptime=10;useinbandfec=1/g,
+        'a=fmtp:$1 minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1;maxaveragebitrate=510000;maxplaybackrate=48000;cbr=1;usedtx=0'
+      );
+
+      // 2. Añadir hints de alto bitrate en los formatos de video (VP8, VP9, H264, AV1)
+      modifiedSdp = modifiedSdp.replace(
+        /a=rtpmap:(\d+) (VP9|VP8|H264|AV1)\/90000/gi,
+        (match, pt, codecName) => {
+          return `${match}\r\na=fmtp:${pt} x-google-max-bitrate=${targetBitrateKbps};x-google-min-bitrate=${minBitrateKbps};x-google-start-bitrate=${startBitrateKbps}`;
+        }
+      );
+
+      // 3. Reordenar payload types si el usuario eligió un códec preferido
+      if (preferredCodec && preferredCodec !== 'AUTO') {
+        modifiedSdp = preferVideoCodec(modifiedSdp, preferredCodec);
+      }
+
+      return modifiedSdp;
+    }
+
+    function preferVideoCodec(sdp, codecName) {
+      const lines = sdp.split('\r\n');
+      const mVideoIndex = lines.findIndex(line => line.startsWith('m=video'));
+      if (mVideoIndex === -1) return sdp;
+
+      const codecRegex = new RegExp(`^a=rtpmap:(\\d+) ${codecName}\\/90000`, 'i');
+      const matchingPayloadTypes = [];
+
+      for (const line of lines) {
+        const match = line.match(codecRegex);
+        if (match) {
+          matchingPayloadTypes.push(match[1]);
+        }
+      }
+
+      if (matchingPayloadTypes.length === 0) return sdp;
+
+      const mLineParts = lines[mVideoIndex].split(' ');
+      const header = mLineParts.slice(0, 3);
+      const payloads = mLineParts.slice(3);
+
+      const prioritized = [
+        ...matchingPayloadTypes,
+        ...payloads.filter(pt => !matchingPayloadTypes.includes(pt))
+      ];
+
+      lines[mVideoIndex] = [...header, ...prioritized].join(' ');
+      return lines.join('\r\n');
+    }
+
+    // Genera un ID corto y fácil de leer
+    function generateRoomId() {
+      const randomPart = Math.random().toString(36).substring(2, 8);
+      return `cine-${randomPart}`;
+    }
+
+    function updateShareUrl(id) {
+      const url = new URL('index.html', window.location.href);
+      url.searchParams.set('sala', id);
+      shareUrlInput.value = url.toString();
+    }
+
+    function initPeer(customId) {
+      if (peer) {
+        peer.destroy();
+      }
+
+      const idToUse = customId || localStorage.getItem('cinep2p_room_id') || generateRoomId();
+      localStorage.setItem('cinep2p_room_id', idToUse);
+      roomIdInput.value = idToUse;
+      updateShareUrl(idToUse);
+
+      statusDot.className = 'dot';
+      statusText.textContent = 'Conectando al servidor de señalización...';
+
+      peer = new Peer(idToUse, {
+        config: rtcConfig,
+        debug: 1
+      });
+
+      peer.on('open', (id) => {
+        statusDot.className = 'dot live';
+        statusText.textContent = `Sala lista (${id})`;
+        roomIdInput.value = id;
+        updateShareUrl(id);
+      });
+
+      // Cuando un espectador se conecta y solicita el stream via conexión de datos
+      peer.on('connection', (conn) => {
+        conn.on('open', () => {
+          if (localStream) {
+            callViewer(conn.peer);
+          } else {
+            conn.send({ type: 'WAITING_STREAM' });
+          }
+        });
+
+        conn.on('data', (data) => {
+          if (data && data.type === 'REQUEST_STREAM' && localStream) {
+            callViewer(conn.peer);
+          }
+        });
+      });
+
+      peer.on('error', (err) => {
+        console.error('PeerJS Error:', err);
+        if (err.type === 'unavailable-id') {
+          const fallbackId = generateRoomId();
+          localStorage.setItem('cinep2p_room_id', fallbackId);
+          initPeer(fallbackId);
+        } else {
+          statusText.textContent = `Aviso red: ${err.type}`;
+        }
+      });
+    }
+
+    // Aplicar parámetros de calidad máxima sobre los RTCRtpSender activos
+    async function applySenderQualityParameters(pc) {
+      if (!pc) return;
+      const maxBitrate = parseInt(bitrateSelect.value, 10);
+      const degradationPreference = degradationSelect.value;
+
+      const senders = pc.getSenders();
+      for (const sender of senders) {
+        if (!sender.track) continue;
+
+        if (sender.track.kind === 'video') {
+          // ContentHint detail/motion para evitar suavizado excesivo
+          sender.track.contentHint = degradationPreference === 'maintain-resolution' ? 'detail' : 'motion';
+          try {
+            const params = sender.getParameters();
+            if (!params.encodings || params.encodings.length === 0) {
+              params.encodings = [{}];
+            }
+            params.encodings[0].maxBitrate = maxBitrate;
+            params.encodings[0].maxFramerate = 60;
+            params.encodings[0].scaleResolutionDownBy = 1.0; // Prohibido reducir escala
+            params.encodings[0].priority = 'high';
+            params.encodings[0].networkPriority = 'high';
+            params.degradationPreference = degradationPreference;
+            await sender.setParameters(params);
+          } catch (e) {
+            console.warn('No se pudieron ajustar todos los parámetros de video:', e);
+          }
+        }
+
+        if (sender.track.kind === 'audio') {
+          sender.track.contentHint = 'music'; // Indica a WebRTC que es música/película y NO voz humana
+          try {
+            const params = sender.getParameters();
+            if (!params.encodings || params.encodings.length === 0) {
+              params.encodings = [{}];
+            }
+            params.encodings[0].maxBitrate = 510000;
+            params.encodings[0].priority = 'high';
+            params.encodings[0].networkPriority = 'high';
+            await sender.setParameters(params);
+          } catch (e) {
+            console.warn('No se pudieron ajustar parámetros de audio:', e);
+          }
+        }
+      }
+    }
+
+    // Llama a un espectador enviándole el stream con SDP modificado de alta calidad
+    function callViewer(viewerPeerId) {
+      if (!localStream || !peer) return;
+
+      // Si ya había una llamada previa con ese espectador, cerrarla limpiamente
+      if (activeViewers.has(viewerPeerId)) {
+        try { activeViewers.get(viewerPeerId).call.close(); } catch (e) {}
+      }
+
+      const call = peer.call(viewerPeerId, localStream, {
+        sdpTransform: enhanceSdpForLosslessStreaming
+      });
+
+      if (!call) return;
+
+      const registerPc = () => {
+        const pc = call.peerConnection;
+        if (!pc) return;
+
+        activeViewers.set(viewerPeerId, {
+          call,
+          pc,
+          lastBytes: 0,
+          lastTimestamp: performance.now()
+        });
+        updateViewerCount();
+
+        // Aplicar bitrate y bloqueo de resolución en cuanto el canal se negocie
+        pc.addEventListener('signalingstatechange', () => {
+          if (pc.signalingState === 'stable') {
+            applySenderQualityParameters(pc);
+          }
+        });
+
+        pc.addEventListener('connectionstatechange', () => {
+          if (['disconnected', 'failed', 'closed'].includes(pc.connectionState)) {
+            activeViewers.delete(viewerPeerId);
+            updateViewerCount();
+          } else if (pc.connectionState === 'connected') {
+            applySenderQualityParameters(pc);
+          }
+        });
+
+        setTimeout(() => applySenderQualityParameters(pc), 600);
+        setTimeout(() => applySenderQualityParameters(pc), 2000);
+      };
+
+      registerPc();
+
+      call.on('close', () => {
+        activeViewers.delete(viewerPeerId);
+        updateViewerCount();
+      });
+
+      call.on('error', () => {
+        activeViewers.delete(viewerPeerId);
+        updateViewerCount();
+      });
+    }
+
+    function updateViewerCount() {
+      const count = activeViewers.size;
+      viewerCountEl.textContent = `${count} espectador${count === 1 ? '' : 'es'} conectado${count === 1 ? '' : 's'}`;
+    }
+
+    // Iniciar captura de pantalla/ventana/pestaña sin filtros de pérdida
+    async function startCapture() {
+      try {
+        const displayMediaOptions = {
+          video: {
+            displaySurface: 'browser',
+            width: { ideal: 3840, max: 3840 },
+            height: { ideal: 2160, max: 2160 },
+            frameRate: { ideal: 60, max: 60 },
+            cursor: 'motion'
+          },
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+            channelCount: { ideal: 2 },
+            sampleRate: { ideal: 48000 },
+            sampleSize: { ideal: 16 },
+            suppressLocalAudioPlayback: false
+          },
+          preferCurrentTab: false,
+          selfBrowserSurface: 'exclude',
+          systemAudio: 'include',
+          surfaceSwitching: 'include'
+        };
+
+        const stream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
+        localStream = stream;
+
+        // Configurar tracks para máxima fidelidad
+        const videoTrack = stream.getVideoTracks()[0];
+        const audioTrack = stream.getAudioTracks()[0];
+
+        if (videoTrack) {
+          videoTrack.contentHint = degradationSelect.value === 'maintain-resolution' ? 'detail' : 'motion';
+          const settings = videoTrack.getSettings();
+          captureBadge.textContent = `${settings.width || '?'}x${settings.height || '?'} @ ${Math.round(settings.frameRate || 60)}fps`;
+          captureBadge.style.color = 'var(--success)';
+
+          videoTrack.onended = () => {
+            stopCapture();
+          };
+        }
+
+        if (audioTrack) {
+          audioTrack.contentHint = 'music';
+          // Asegurar que ningún filtro de voz quede activo si el navegador lo soporta
+          try {
+            await audioTrack.applyConstraints({
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
+              channelCount: 2
+            });
+          } catch (e) {}
+          audioAlert.style.display = 'none';
+        } else {
+          audioAlert.style.display = 'block';
+        }
+
+        localVideo.srcObject = stream;
+        placeholder.style.display = 'none';
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+
+        // Si ya había espectadores esperando en la sala, llamarlos inmediatamente
+        if (peer && peer._connections) {
+          for (const [peerId, conns] of Object.entries(peer._connections)) {
+            if (conns && conns.length > 0) {
+              callViewer(peerId);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error al capturar pantalla:', err);
+      }
+    }
+
+    function stopCapture() {
+      if (localStream) {
+        localStream.getTracks().forEach(t => t.stop());
+        localStream = null;
+      }
+      localVideo.srcObject = null;
+      placeholder.style.display = 'block';
+      audioAlert.style.display = 'none';
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      captureBadge.textContent = 'Sin señal';
+      captureBadge.style.color = 'var(--muted)';
+
+      for (const [, viewer] of activeViewers) {
+        try { viewer.call.close(); } catch (e) {}
+      }
+      activeViewers.clear();
+      updateViewerCount();
+
+      statRes.textContent = '—';
+      statFps.textContent = '—';
+      statVideoBitrate.textContent = '0.0 Mbps';
+    }
+
+    // Telemetría en tiempo real cada segundo
+    setInterval(async () => {
+      if (!localStream) return;
+
+      const videoTrack = localStream.getVideoTracks()[0];
+      if (videoTrack) {
+        const s = videoTrack.getSettings();
+        if (s.width && s.height) {
+          statRes.textContent = `${s.width}×${s.height}`;
+        }
+        if (s.frameRate) {
+          statFps.textContent = `${Math.round(s.frameRate)} FPS`;
+        }
+      }
+
+      if (activeViewers.size === 0) {
+        statVideoBitrate.textContent = 'Esperando espectador...';
+        return;
+      }
+
+      // Medir el primer espectador activo
+      const firstViewer = activeViewers.values().next().value;
+      if (!firstViewer || !firstViewer.pc) return;
+
+      try {
+        const stats = await firstViewer.pc.getStats();
+        stats.forEach(report => {
+          if (report.type === 'outbound-rtp' && report.kind === 'video') {
+            const now = performance.now();
+            const bytes = report.bytesSent || 0;
+            const elapsedSec = (now - firstViewer.lastTimestamp) / 1000;
+
+            if (elapsedSec > 0 && firstViewer.lastBytes > 0) {
+              const bitsPerSecond = ((bytes - firstViewer.lastBytes) * 8) / elapsedSec;
+              const mbps = (bitsPerSecond / 1_000_000).toFixed(2);
+              statVideoBitrate.textContent = `${mbps} Mbps`;
+            }
+
+            firstViewer.lastBytes = bytes;
+            firstViewer.lastTimestamp = now;
+
+            if (report.frameWidth && report.frameHeight) {
+              statRes.textContent = `${report.frameWidth}×${report.frameHeight}`;
+            }
+            if (report.framesPerSecond !== undefined) {
+              statFps.textContent = `${Math.round(report.framesPerSecond)} FPS`;
+            }
+          }
+
+          if (report.type === 'codec' && report.mimeType && report.mimeType.startsWith('video/')) {
+            const codecShort = report.mimeType.split('/')[1];
+            statCodec.textContent = `${codecShort} + Opus 510k`;
+          }
+        });
+      } catch (e) {}
+    }, 1000);
+
+    // Eventos UI
+    startBtn.addEventListener('click', startCapture);
+    stopBtn.addEventListener('click', stopCapture);
+
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(shareUrlInput.value);
+        const orig = copyBtn.innerHTML;
+        copyBtn.innerHTML = '✅ ¡Copiado!';
+        setTimeout(() => { copyBtn.innerHTML = orig; }, 2000);
+      } catch (e) {
+        shareUrlInput.select();
+        document.execCommand('copy');
+      }
+    });
+
+    applyRoomBtn.addEventListener('click', () => {
+      const cleanId = roomIdInput.value.trim().replace(/[^a-zA-Z0-9_-]/g, '-');
+      if (cleanId) {
+        initPeer(cleanId);
+      }
+    });
+
+    bitrateSelect.addEventListener('change', () => {
+      for (const [, viewer] of activeViewers) {
+        applySenderQualityParameters(viewer.pc);
+      }
+    });
+
+    degradationSelect.addEventListener('change', () => {
+      for (const [, viewer] of activeViewers) {
+        applySenderQualityParameters(viewer.pc);
+      }
+    });
+
+    // Inicializar al abrir la página
+    initPeer();
+  </script>
+</body>
+</html>

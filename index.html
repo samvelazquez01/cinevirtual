@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CineP2P — Sala de Cine en Tiempo Real</title>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <style>
+    :root {
+      --bg: #050608;
+      --panel: rgba(18, 22, 33, 0.88);
+      --border: rgba(255, 255, 255, 0.12);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --success: #10b981;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    .stage {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at center, #0f131f 0%, #050608 100%);
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #000;
+    }
+
+    /* Barra superior flotante */
+    .top-bar {
+      position: absolute;
+      top: 1.25rem;
+      left: 1.5rem;
+      right: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+      z-index: 20;
+      transition: opacity 0.35s ease;
+    }
+
+    .stage.hide-ui .top-bar,
+    .stage.hide-ui .bottom-bar {
+      opacity: 0;
+    }
+
+    .stage.hide-ui {
+      cursor: none;
+    }
+
+    .pill {
+      pointer-events: auto;
+      background: var(--panel);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--border);
+      padding: 0.5rem 1rem;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.45);
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #f59e0b;
+    }
+
+    .dot.live {
+      background: var(--success);
+      box-shadow: 0 0 10px var(--success);
+    }
+
+    /* Tarjeta central de conexión / espera */
+    .overlay-card {
+      position: absolute;
+      z-index: 15;
+      background: var(--panel);
+      backdrop-filter: blur(18px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      width: 92%;
+      max-width: 440px;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);
+      display: flex;
+      flex-direction: column;
+      gap: 1.15rem;
+    }
+
+    .overlay-card h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+    }
+
+    .overlay-card p {
+      font-size: 0.9rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      outline: none;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent);
+    }
+
+    .btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.25rem;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.1s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .btn:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-ghost {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.85rem;
+      border-radius: 8px;
+      font-size: 0.83rem;
+    }
+
+    .btn-ghost:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    /* Botón flotante para desbloquear audio si el navegador lo silencia por autoplay */
+    .unmute-banner {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 25;
+      background: rgba(99, 102, 241, 0.95);
+      color: white;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      padding: 1rem 1.75rem;
+      border-radius: 999px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+      display: none;
+      align-items: center;
+      gap: 0.65rem;
+      animation: bounce 2s infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translate(-50%, -50%) scale(1); }
+      50% { transform: translate(-50%, -50%) scale(1.05); }
+    }
+
+    /* Controles inferiores del reproductor */
+    .bottom-bar {
+      position: absolute;
+      bottom: 1.25rem;
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 3rem);
+      max-width: 900px;
+      background: var(--panel);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 0.7rem 1.15rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      z-index: 20;
+      transition: opacity 0.35s ease;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .controls-group {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    input[type="range"] {
+      width: 100px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    /* Panel de estadísticas de calidad en vivo */
+    .stats-popover {
+      position: absolute;
+      top: 4.5rem;
+      right: 1.5rem;
+      background: var(--panel);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.9rem 1.1rem;
+      font-size: 0.8rem;
+      z-index: 22;
+      display: none;
+      min-width: 230px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    .stats-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.28rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      gap: 1rem;
+    }
+
+    .stats-row:last-child {
+      border-bottom: none;
+    }
+
+    .stats-row span:first-child {
+      color: var(--muted);
+    }
+
+    .stats-row span:last-child {
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="stage" class="stage">
+    <!-- Barra Superior -->
+    <div class="top-bar">
+      <div class="pill">
+        <span>🍿 CineP2P</span>
+        <span style="color: var(--muted);">|</span>
+        <div id="statusDot" class="dot"></div>
+        <span id="statusLabel">Esperando sala...</span>
+      </div>
+
+      <div class="pill" style="gap: 0.5rem;">
+        <span id="liveQualityBadge" style="color: #a5b4fc;">Directo P2P</span>
+        <button id="toggleStatsBtn" class="btn btn-ghost" style="padding: 0.25rem 0.6rem;">📊 Info Señal</button>
+      </div>
+    </div>
+
+    <!-- Estadísticas detalladas -->
+    <div id="statsPopover" class="stats-popover">
+      <div class="stats-row">
+        <span>Resolución:</span>
+        <span id="statRes">—</span>
+      </div>
+      <div class="stats-row">
+        <span>Framerate:</span>
+        <span id="statFps">—</span>
+      </div>
+      <div class="stats-row">
+        <span>Bitrate Video:</span>
+        <span id="statBitrate">0.0 Mbps</span>
+      </div>
+      <div class="stats-row">
+        <span>Bitrate Audio:</span>
+        <span id="statAudioBitrate">0 kbps</span>
+      </div>
+      <div class="stats-row">
+        <span>Latencia (Ping):</span>
+        <span id="statPing">— ms</span>
+      </div>
+    </div>
+
+    <!-- Tarjeta de Conexión Inicial -->
+    <div id="connectCard" class="overlay-card">
+      <div style="font-size: 2.4rem;">🎬</div>
+      <h2 id="cardTitle">Conectar a la Transmisión</h2>
+      <p id="cardDesc">Introduce el código de la sala o abre directamente el enlace que te compartió el emisor.</p>
+      <div class="input-row">
+        <input type="text" id="roomInput" placeholder="Ej: cine-a1b2c3" />
+        <button id="joinBtn" class="btn">Entrar</button>
+      </div>
+    </div>
+
+    <!-- Botón para activar sonido si el navegador bloqueó el audio automático -->
+    <button id="unmuteBanner" class="unmute-banner">
+      🔊 Haz clic aquí para activar el Audio Estéreo
+    </button>
+
+    <!-- Reproductor de Video Principal -->
+    <video id="remoteVideo" autoplay playsinline></video>
+
+    <!-- Barra Inferior de Controles -->
+    <div class="bottom-bar">
+      <div class="controls-group">
+        <button id="muteBtn" class="btn btn-ghost" title="Silenciar / Activar sonido">🔊</button>
+        <input id="volumeSlider" type="range" min="0" max="1" step="0.02" value="1" title="Volumen" />
+        <span id="volumeLabel" style="font-size: 0.8rem; color: var(--muted); min-width: 38px;">100%</span>
+      </div>
+
+      <div class="controls-group">
+        <button id="reconnectBtn" class="btn btn-ghost" title="Reconectar señal">🔄 Reconectar</button>
+        <button id="pipBtn" class="btn btn-ghost" title="Modo ventana flotante">🖼️ PiP</button>
+        <button id="fullscreenBtn" class="btn" style="padding: 0.5rem 0.95rem;">⛶ Pantalla Completa</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const stage = document.getElementById('stage');
+    const remoteVideo = document.getElementById('remoteVideo');
+    const connectCard = document.getElementById('connectCard');
+    const cardTitle = document.getElementById('cardTitle');
+    const cardDesc = document.getElementById('cardDesc');
+    const roomInput = document.getElementById('roomInput');
+    const joinBtn = document.getElementById('joinBtn');
+    const statusDot = document.getElementById('statusDot');
+    const statusLabel = document.getElementById('statusLabel');
+    const liveQualityBadge = document.getElementById('liveQualityBadge');
+    const unmuteBanner = document.getElementById('unmuteBanner');
+
+    const muteBtn = document.getElementById('muteBtn');
+    const volumeSlider = document.getElementById('volumeSlider');
+    const volumeLabel = document.getElementById('volumeLabel');
+    const reconnectBtn = document.getElementById('reconnectBtn');
+    const pipBtn = document.getElementById('pipBtn');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const toggleStatsBtn = document.getElementById('toggleStatsBtn');
+    const statsPopover = document.getElementById('statsPopover');
+
+    const statRes = document.getElementById('statRes');
+    const statFps = document.getElementById('statFps');
+    const statBitrate = document.getElementById('statBitrate');
+    const statAudioBitrate = document.getElementById('statAudioBitrate');
+    const statPing = document.getElementById('statPing');
+
+    let peer = null;
+    let dataConn = null;
+    let currentCall = null;
+    let targetRoomId = null;
+
+    let lastVideoBytes = 0;
+    let lastAudioBytes = 0;
+    let lastStatsTime = performance.now();
+
+    const rtcConfig = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun.cloudflare.com:3478' }
+      ],
+      sdpSemantics: 'unified-plan'
+    };
+
+    // Asegura que nuestra respuesta SDP también acepte audio estéreo de 510 kbps y alto bitrate
+    function enhanceAnswerSdp(sdp) {
+      return sdp.replace(
+        /a=fmtp:(\d+) minptime=10;useinbandfec=1/g,
+        'a=fmtp:$1 minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1;maxaveragebitrate=510000;maxplaybackrate=48000;cbr=1;usedtx=0'
+      );
+    }
+
+    function connectToBroadcaster(roomId) {
+      if (!roomId) return;
+      targetRoomId = roomId.trim();
+      roomInput.value = targetRoomId;
+
+      // Actualizar la URL sin recargar para que sea fácil de guardar
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set('sala', targetRoomId);
+      window.history.replaceState({}, '', newUrl);
+
+      cardTitle.textContent = 'Conectando a la sala...';
+      cardDesc.textContent = `Buscando señal en vivo de "${targetRoomId}"...`;
+      statusDot.className = 'dot';
+      statusLabel.textContent = `Conectando a ${targetRoomId}...`;
+
+      if (peer) {
+        peer.destroy();
+      }
+
+      peer = new Peer({
+        config: rtcConfig,
+        debug: 1
+      });
+
+      peer.on('open', () => {
+        // Abrir canal de datos con el emisor para solicitar que nos llame con el stream
+        dataConn = peer.connect(targetRoomId, { reliable: true });
+
+        dataConn.on('open', () => {
+          statusLabel.textContent = 'Conectado. Esperando video del emisor...';
+          cardTitle.textContent = 'Conectado con el Emisor';
+          cardDesc.textContent = 'Esperando a que el emisor inicie la captura de ventana/película...';
+          dataConn.send({ type: 'REQUEST_STREAM' });
+        });
+
+        dataConn.on('data', (data) => {
+          if (data && data.type === 'WAITING_STREAM') {
+            cardTitle.textContent = 'Sala lista — Esperando película';
+            cardDesc.textContent = 'Estás dentro de la sala. En cuanto el emisor pulse "Capturar Ventana", la imagen aparecerá automáticamente.';
+          }
+        });
+      });
+
+      // Recibir la llamada WebRTC con el stream de alta calidad
+      peer.on('call', (call) => {
+        if (currentCall) {
+          try { currentCall.close(); } catch (e) {}
+        }
+        currentCall = call;
+
+        call.answer(undefined, {
+          sdpTransform: enhanceAnswerSdp
+        });
+
+        call.on('stream', (remoteStream) => {
+          // Aumentar jitterBufferTarget si está disponible para reproducción de película ultra fluida sin micro-cortes
+          try {
+            const receivers = call.peerConnection.getReceivers();
+            receivers.forEach(r => {
+              if ('playoutDelayHint' in r) {
+                r.playoutDelayHint = 0.06; // 60ms de buffer suave para evitar tirones de red manteniendo sincronía A/V
+              }
+            });
+          } catch (e) {}
+
+          remoteVideo.srcObject = remoteStream;
+          connectCard.style.display = 'none';
+          statusDot.className = 'dot live';
+          statusLabel.textContent = 'En Directo (Calidad Original)';
+
+          // Intentar reproducir con sonido; si el navegador exige interacción del usuario, mostrar el botón de 1 clic
+          remoteVideo.muted = false;
+          const playPromise = remoteVideo.play();
+          if (playPromise !== undefined) {
+            playPromise.catch(() => {
+              remoteVideo.muted = true;
+              remoteVideo.play();
+              unmuteBanner.style.display = 'flex';
+              updateMuteUI();
+            });
+          }
+        });
+
+        call.on('close', () => {
+          statusDot.className = 'dot';
+          statusLabel.textContent = 'Transmisión finalizada o en pausa';
+          connectCard.style.display = 'flex';
+          cardTitle.textContent = 'Transmisión en pausa';
+          cardDesc.textContent = 'El emisor ha detenido la captura. Se reconectará automáticamente cuando vuelva a transmitir.';
+        });
+      });
+
+      peer.on('error', (err) => {
+        console.warn('Error Peer:', err);
+        statusDot.className = 'dot';
+        statusLabel.textContent = 'Emisor no encontrado aún';
+        connectCard.style.display = 'flex';
+        cardTitle.textContent = 'No se encontró la sala activa';
+        cardDesc.textContent = 'Asegúrate de que el emisor tenga abierta la página emisor.html y verifica el código.';
+      });
+    }
+
+    // Activar sonido al hacer clic en el aviso
+    unmuteBanner.addEventListener('click', () => {
+      remoteVideo.muted = false;
+      remoteVideo.volume = parseFloat(volumeSlider.value) || 1;
+      remoteVideo.play();
+      unmuteBanner.style.display = 'none';
+      updateMuteUI();
+    });
+
+    function updateMuteUI() {
+      if (remoteVideo.muted || remoteVideo.volume === 0) {
+        muteBtn.textContent = '🔇';
+      } else {
+        muteBtn.textContent = '🔊';
+      }
+    }
+
+    muteBtn.addEventListener('click', () => {
+      remoteVideo.muted = !remoteVideo.muted;
+      if (!remoteVideo.muted) {
+        unmuteBanner.style.display = 'none';
+      }
+      updateMuteUI();
+    });
+
+    volumeSlider.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      remoteVideo.volume = val;
+      remoteVideo.muted = val === 0;
+      volumeLabel.textContent = `${Math.round(val * 100)}%`;
+      if (val > 0) {
+        unmuteBanner.style.display = 'none';
+      }
+      updateMuteUI();
+    });
+
+    fullscreenBtn.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        stage.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    });
+
+    // Doble clic en el video para pantalla completa
+    remoteVideo.addEventListener('dblclick', () => {
+      fullscreenBtn.click();
+    });
+
+    pipBtn.addEventListener('click', async () => {
+      try {
+        if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture();
+        } else if (remoteVideo.readyState >= 1) {
+          await remoteVideo.requestPictureInPicture();
+        }
+      } catch (e) {}
+    });
+
+    reconnectBtn.addEventListener('click', () => {
+      if (targetRoomId) {
+        connectToBroadcaster(targetRoomId);
+      }
+    });
+
+    toggleStatsBtn.addEventListener('click', () => {
+      const visible = statsPopover.style.display === 'block';
+      statsPopover.style.display = visible ? 'none' : 'block';
+    });
+
+    joinBtn.addEventListener('click', () => {
+      const code = roomInput.value.trim();
+      if (code) {
+        connectToBroadcaster(code);
+      }
+    });
+
+    roomInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        joinBtn.click();
+      }
+    });
+
+    // Auto-ocultar controles cuando el ratón no se mueve viendo la película
+    let uiTimeout = null;
+    stage.addEventListener('mousemove', () => {
+      stage.classList.remove('hide-ui');
+      clearTimeout(uiTimeout);
+      if (connectCard.style.display === 'none') {
+        uiTimeout = setTimeout(() => {
+          if (statsPopover.style.display !== 'block') {
+            stage.classList.add('hide-ui');
+          }
+        }, 3000);
+      }
+    });
+
+    // Telemetría de recepción en vivo
+    setInterval(async () => {
+      if (!currentCall || !currentCall.peerConnection) return;
+
+      try {
+        const stats = await currentCall.peerConnection.getStats();
+        const now = performance.now();
+        const elapsedSec = (now - lastStatsTime) / 1000;
+
+        stats.forEach(report => {
+          if (report.type === 'inbound-rtp' && report.kind === 'video') {
+            const bytes = report.bytesReceived || 0;
+            if (elapsedSec > 0 && lastVideoBytes > 0) {
+              const mbps = (((bytes - lastVideoBytes) * 8) / elapsedSec / 1_000_000).toFixed(2);
+              statBitrate.textContent = `${mbps} Mbps`;
+              liveQualityBadge.textContent = `${report.frameHeight ? report.frameHeight + 'p' : 'HD'} • ${mbps} Mbps`;
+            }
+            lastVideoBytes = bytes;
+
+            if (report.frameWidth && report.frameHeight) {
+              statRes.textContent = `${report.frameWidth}×${report.frameHeight}`;
+            }
+            if (report.framesPerSecond !== undefined) {
+              statFps.textContent = `${Math.round(report.framesPerSecond)} FPS`;
+            }
+          }
+
+          if (report.type === 'inbound-rtp' && report.kind === 'audio') {
+            const bytes = report.bytesReceived || 0;
+            if (elapsedSec > 0 && lastAudioBytes > 0) {
+              const kbps = Math.round(((bytes - lastAudioBytes) * 8) / elapsedSec / 1000);
+              statAudioBitrate.textContent = `${kbps} kbps Estéreo`;
+            }
+            lastAudioBytes = bytes;
+          }
+
+          if (report.type === 'candidate-pair' && report.state === 'succeeded' && report.currentRoundTripTime !== undefined) {
+            statPing.textContent = `${Math.round(report.currentRoundTripTime * 1000)} ms`;
+          }
+        });
+
+        lastStatsTime = now;
+      } catch (e) {}
+    }, 1000);
+
+    // Leer automáticamente ?sala=... de la URL al abrir el enlace
+    window.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(window.location.search);
+      const roomFromUrl = params.get('sala') || params.get('id') || params.get('room');
+      if (roomFromUrl) {
+        roomInput.value = roomFromUrl;
+        connectToBroadcaster(roomFromUrl);
+      }
+    });
+  </script>
+</body>
+</html>
