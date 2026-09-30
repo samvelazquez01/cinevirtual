@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CineP2P — Emisor Chrome (Video + Audio Sistema)</title>
+  <title>CineP2P — Emisor Chrome (v5.0 Direct-Call)</title>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <style>
     :root {
@@ -54,7 +54,7 @@
     }
 
     .badge-pro {
-      background: linear-gradient(135deg, #6366f1, #10b981);
+      background: linear-gradient(135deg, #10b981, #6366f1);
       font-size: 0.7rem;
       padding: 0.22rem 0.6rem;
       border-radius: 999px;
@@ -333,7 +333,7 @@
   <header>
     <div class="brand">
       <span>🎬 CineP2P — Emisor Chrome</span>
-      <span class="badge-pro">Video + Audio Juntos</span>
+      <span class="badge-pro">v5.0 • Direct-Call Internacional + Safari</span>
     </div>
     <div style="display: flex; align-items: center; gap: 0.75rem;">
       <div class="status-pill">
@@ -350,29 +350,29 @@
     <!-- Columna Izquierda -->
     <div class="card">
       <div class="card-title">
-        <span>Vista Previa de lo que se está enviando</span>
+        <span>Vista Previa de Emisión</span>
         <span id="captureBadge" style="font-size: 0.8rem; color: var(--muted);">Sin señal</span>
       </div>
 
       <div class="preview-container">
         <video id="localVideo" autoplay playsinline muted></video>
         <div id="placeholder" class="preview-placeholder">
-          <h3 style="color: var(--text); margin-bottom: 0.4rem; font-size: 1.2rem;">Cómo transmitir tu App de Películas con Video + Audio en Chrome</h3>
+          <h3 style="color: var(--text); margin-bottom: 0.4rem; font-size: 1.2rem;">Transmitir Pantalla + Audio del Sistema en Chrome</h3>
           <p style="font-size: 0.86rem; line-height: 1.45;">
-            En Chrome de Windows, si eliges la pestaña <em>"Window / Ventana"</em>, Chrome <strong>NO envía audio y congela el video</strong> cuando cambias de ventana. Sigue estos 3 pasos al pulsar el botón azul:
+            Para que Chrome envíe el <strong>Video + Audio todo junto</strong> sin congelarse:
           </p>
           <div class="steps-visual">
             <div class="step-chip">
               <strong>Paso 1</strong>
-              En el cuadro de Chrome, haz clic arriba a la derecha en <b>"Entire Screen" (Pantalla completa)</b>.
+              En el cuadro de Chrome, elige arriba a la derecha <b>"Entire Screen" (Pantalla completa)</b>.
             </div>
             <div class="step-chip">
               <strong>Paso 2</strong>
-              Haz clic sobre el recuadro de tu monitor y <b>activa abajo el interruptor "Share system audio"</b>.
+              Haz clic sobre tu monitor y activa abajo <b>"Share system audio" (Compartir audio)</b>.
             </div>
             <div class="step-chip">
               <strong>Paso 3</strong>
-              Pulsa <b>Share / Compartir</b> y abre tu App de Películas encima. ¡Se enviará Video + Audio juntos!
+              Pulsa <b>Share</b> y abre tu App de Películas en pantalla.
             </div>
           </div>
         </div>
@@ -380,7 +380,7 @@
 
       <div id="audioStatusBanner" class="info-banner"></div>
 
-      <!-- Barra de Nivel de Audio y Botones -->
+      <!-- Barra de Nivel de Audio -->
       <div class="meter-container">
         <span id="audioStatusLabel" style="font-size: 0.82rem; font-weight: 700; color: var(--muted); white-space: nowrap;">
           🔇 Audio: Esperando captura...
@@ -395,7 +395,7 @@
           🖥️ Transmitir Pantalla + Audio del Sistema (Todo Junto)
         </button>
         <input type="file" id="movieFileInput" accept="video/*,.mkv" style="display: none;" />
-        <button id="loadFileBtn" class="btn btn-success" title="Si tienes el archivo de la película descargado en tu PC">
+        <button id="loadFileBtn" class="btn btn-success">
           📁 O Cargar Archivo de Video Directo
         </button>
         <button id="stopBtn" class="btn btn-danger" disabled>
@@ -406,7 +406,6 @@
 
     <!-- Columna Derecha -->
     <div class="sidebar">
-      <!-- Enlace para compartir -->
       <div class="card">
         <div class="card-title">
           <span>🌍 Sala y Enlace (Conexión Internacional)</span>
@@ -414,7 +413,7 @@
         </div>
 
         <div class="form-group">
-          <label><span>Código de Sala</span></label>
+          <label><span>Código de Sala (Único para evitar colisiones)</span></label>
           <div class="link-box">
             <input type="text" id="roomIdInput" placeholder="Generando..." />
             <button id="applyRoomBtn" class="btn btn-secondary" style="padding: 0.6rem 0.9rem; white-space: nowrap;">
@@ -449,7 +448,7 @@
             <option value="8000000" selected>8 Mbps — Internacional Estable 1080p (Ideal entre países)</option>
             <option value="15000000">15 Mbps — Alta Definición 1080p60</option>
             <option value="25000000">25 Mbps — Blu-Ray Master</option>
-            <option value="4000000">4 Mbps — Ultra Estable (Larga distancia)</option>
+            <option value="4000000">4 Mbps — Ultra Estable (Larga distancia / Celular)</option>
           </select>
         </div>
 
@@ -478,12 +477,12 @@
             <div class="stat-value" id="statFps">—</div>
           </div>
           <div class="stat-item">
-            <div class="stat-label">Bitrate Video</div>
+            <div class="stat-label">Bitrate Enviado</div>
             <div class="stat-value" id="statVideoBitrate">0.0 Mbps</div>
           </div>
           <div class="stat-item">
             <div class="stat-label">Estado Red</div>
-            <div class="stat-value" id="statNetType">Lista</div>
+            <div class="stat-value" id="statNetType">Esperando...</div>
           </div>
         </div>
       </div>
@@ -529,11 +528,11 @@
     let analyserNode = null;
     let meterAnimId = null;
 
-    const knownViewerIds = new Set();
+    // Registro de llamadas y espectadores activos: viewerPeerId -> { call, pc, lastBytes, lastTimestamp }
     const activeViewers = new Map();
     const dataConnections = new Map();
 
-    // Configuración STUN + TURN Internacional (UDP + TCP + TLS)
+    // Servidores STUN + TURN Globales redundantes (OpenRelay + ExpressTURN/Metered en puertos 80 y 443 UDP/TCP/TLS)
     const rtcConfig = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -549,11 +548,26 @@
           ],
           username: 'openrelayproject',
           credential: 'openrelayproject'
+        },
+        {
+          urls: [
+            'turn:standard.relay.metered.ca:80',
+            'turn:standard.relay.metered.ca:80?transport=tcp',
+            'turn:standard.relay.metered.ca:443',
+            'turn:standard.relay.metered.ca:443?transport=tcp',
+            'turns:standard.relay.metered.ca:443?transport=tcp'
+          ],
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
         }
       ],
       iceCandidatePoolSize: 10
     };
 
+    /**
+     * Optimización de Audio Estéreo 510 kbps sin tocar los payload types de video,
+     * permitiendo que WebRTC negocie limpiamente el perfil de video con Safari iOS y Chrome Internacional.
+     */
     function enhanceSdpSafe(sdp) {
       if (!sdp) return sdp;
       return sdp.replace(
@@ -563,8 +577,8 @@
     }
 
     function generateRoomId() {
-      const randomPart = Math.random().toString(36).substring(2, 8);
-      return `cine-${randomPart}`;
+      const randomPart = Math.random().toString(36).substring(2, 7);
+      return `sala-${randomPart}`;
     }
 
     function updateShareUrl(id) {
@@ -577,12 +591,12 @@
       stopAudioMeter();
       const audioTracks = stream ? stream.getAudioTracks() : [];
       if (audioTracks.length === 0) {
-        audioStatusLabel.textContent = '❌ SIN AUDIO (Elegiste "Window" o no marcaste "Share system audio")';
+        audioStatusLabel.textContent = '❌ SIN AUDIO (No marcaste "Share system audio")';
         audioStatusLabel.style.color = 'var(--danger)';
         return;
       }
 
-      audioStatusLabel.textContent = '🔊 Audio Estéreo 510 kbps Enviándose:';
+      audioStatusLabel.textContent = '🔊 Audio Estéreo 510 kbps Activo:';
       audioStatusLabel.style.color = 'var(--success)';
 
       try {
@@ -661,16 +675,11 @@
         if (audioTrack) {
           audioTrack.contentHint = 'music';
           audioStatusBanner.className = 'info-banner ok';
-          audioStatusBanner.innerHTML = `✅ <strong>¡Perfecto! Video + Audio del Sistema activos al mismo tiempo.</strong> Ahora pon tu App de películas en pantalla y se verá y escuchará sin pérdidas.`;
+          audioStatusBanner.innerHTML = `✅ <strong>¡Perfecto! Video + Audio del Sistema activos al mismo tiempo.</strong>`;
           audioStatusBanner.style.display = 'block';
         } else {
-          const surfaceType = videoTrack ? videoTrack.getSettings().displaySurface : '';
           audioStatusBanner.className = 'info-banner warning';
-          if (surfaceType === 'window') {
-            audioStatusBanner.innerHTML = `⚠️ <strong>Seleccionaste "Window / Ventana" en lugar de "Entire Screen / Pantalla completa".</strong><br/>En tu captura inferior dice <em>"samvelazquez01.github.io is sharing a window"</em>. Cuando eliges <b>Window</b>, Chrome desactiva el audio del sistema y además congela el video cuando cambias de ventana.<br/>👉 Pulsa <b>⏹️ Detener</b>, vuelve a darle a <b>Transmitir</b>, haz clic arriba a la derecha en la pestaña <b>"Entire Screen / Pantalla completa"</b> y activa el interruptor <b>"Share system audio / Compartir audio del sistema"</b>.`;
-          } else {
-            audioStatusBanner.innerHTML = `⚠️ <strong>Olvidaste activar el interruptor "Share system audio / Compartir también el audio del sistema"</strong> abajo en el recuadro de Chrome antes de darle a Share.`;
-          }
+          audioStatusBanner.innerHTML = `⚠️ <strong>Estás compartiendo video sin audio:</strong> Asegúrate de elegir la pestaña <b>"Entire Screen / Pantalla completa"</b> y activar abajo <b>"Share system audio"</b>.`;
           audioStatusBanner.style.display = 'block';
         }
 
@@ -685,7 +694,7 @@
         stopBtn.disabled = false;
 
         startAudioMeter(combinedStream);
-        callAllKnownViewers();
+        broadcastStreamToAllViewers();
       } catch (err) {
         console.warn('Captura cancelada:', err);
       }
@@ -725,7 +734,7 @@
       audioStatusBanner.style.display = 'block';
 
       startAudioMeter(combinedStream);
-      callAllKnownViewers();
+      broadcastStreamToAllViewers();
     });
 
     function stopCapture() {
@@ -755,6 +764,7 @@
         try { viewer.call.close(); } catch (e) {}
       }
       activeViewers.clear();
+      updateViewerCount();
 
       for (const [, conn] of dataConnections) {
         try { conn.send({ type: 'STREAM_STOPPED' }); } catch (e) {}
@@ -774,13 +784,17 @@
         try { peer.destroy(); } catch (e) {}
       }
 
-      const idToUse = customId || localStorage.getItem('cinep2p_room_id') || generateRoomId();
+      // Evitar nombres genéricos como "cine" que chocan en el servidor público de PeerJS
+      let idToUse = customId || localStorage.getItem('cinep2p_room_id') || generateRoomId();
+      if (idToUse.toLowerCase() === 'cine' || idToUse.length < 4) {
+        idToUse = generateRoomId();
+      }
       localStorage.setItem('cinep2p_room_id', idToUse);
       roomIdInput.value = idToUse;
       updateShareUrl(idToUse);
 
       statusDot.className = 'dot';
-      statusText.textContent = 'Conectando sala...';
+      statusText.textContent = 'Conectando sala global...';
 
       peer = new Peer(idToUse, {
         config: rtcConfig,
@@ -794,14 +808,35 @@
         updateShareUrl(id);
       });
 
+      /**
+       * ARQUITECTURA DIRECT-CALL (v5.0):
+       * El espectador en index.html inicia directamente la llamada de medios (peer.call) hacia el emisor,
+       * o abre un canal de datos. Así funciona aunque los canales de datos estén bloqueados en redes móviles/internacionales.
+       */
+      peer.on('call', (incomingCall) => {
+        if (roomClosedManually) return;
+        const viewerId = incomingCall.peer;
+
+        if (combinedStream) {
+          // Responder directamente a la llamada del espectador enviándole nuestro stream de pantalla + audio
+          incomingCall.answer(combinedStream, {
+            sdpTransform: enhanceSdpSafe
+          });
+          registerViewerCall(viewerId, incomingCall);
+        } else {
+          // Si aún no hemos iniciado captura, guardamos su ID y le llamaremos en cuanto iniciemos
+          incomingCall.close();
+        }
+      });
+
       peer.on('connection', (conn) => {
-        knownViewerIds.add(conn.peer);
         dataConnections.set(conn.peer, conn);
         updateViewerCount();
 
         conn.on('open', () => {
           if (combinedStream) {
-            callViewer(conn.peer);
+            conn.send({ type: 'STREAM_READY' });
+            callViewerOutward(conn.peer);
           } else {
             conn.send({ type: 'WAITING_STREAM' });
           }
@@ -810,9 +845,8 @@
         conn.on('data', (data) => {
           if (!data) return;
           if (data.type === 'REQUEST_STREAM') {
-            knownViewerIds.add(conn.peer);
             if (combinedStream) {
-              callViewer(conn.peer);
+              callViewerOutward(conn.peer);
             } else {
               conn.send({ type: 'WAITING_STREAM' });
             }
@@ -838,8 +872,57 @@
       });
     }
 
+    function registerViewerCall(viewerId, call) {
+      if (activeViewers.has(viewerId)) {
+        const old = activeViewers.get(viewerId);
+        if (old.call !== call) {
+          try { old.call.close(); } catch (e) {}
+        }
+      }
+
+      const pc = call.peerConnection;
+      if (!pc) return;
+
+      activeViewers.set(viewerId, {
+        call,
+        pc,
+        lastBytes: 0,
+        lastTimestamp: performance.now()
+      });
+      updateViewerCount();
+
+      pc.addEventListener('connectionstatechange', () => {
+        if (pc.connectionState === 'connected') {
+          applySenderQualityParameters(pc);
+        } else if (['failed', 'closed', 'disconnected'].includes(pc.connectionState)) {
+          activeViewers.delete(viewerId);
+          updateViewerCount();
+        }
+      });
+
+      setTimeout(() => applySenderQualityParameters(pc), 700);
+      setTimeout(() => applySenderQualityParameters(pc), 2200);
+    }
+
+    function callViewerOutward(viewerPeerId) {
+      if (!combinedStream || !peer || roomClosedManually) return;
+
+      const call = peer.call(viewerPeerId, combinedStream, {
+        sdpTransform: enhanceSdpSafe
+      });
+      if (call) {
+        registerViewerCall(viewerPeerId, call);
+      }
+    }
+
+    function broadcastStreamToAllViewers() {
+      for (const [viewerId, conn] of dataConnections) {
+        try { conn.send({ type: 'STREAM_READY' }); } catch (e) {}
+        callViewerOutward(viewerId);
+      }
+    }
+
     function removeViewer(viewerId) {
-      knownViewerIds.delete(viewerId);
       dataConnections.delete(viewerId);
       if (activeViewers.has(viewerId)) {
         try { activeViewers.get(viewerId).call.close(); } catch (e) {}
@@ -855,7 +938,6 @@
           try { conn.send({ type: 'ROOM_CLOSED' }); } catch (e) {}
         }
         stopCapture();
-        knownViewerIds.clear();
         dataConnections.clear();
         activeViewers.clear();
         updateViewerCount();
@@ -914,53 +996,10 @@
       }
     }
 
-    // Llamada WebRTC con Keep-Alive para que Chrome envíe fotogramas continuamente incluso si la imagen está quieta
-    function callViewer(viewerPeerId) {
-      if (!combinedStream || !peer || roomClosedManually) return;
-
-      if (activeViewers.has(viewerPeerId)) {
-        try { activeViewers.get(viewerPeerId).call.close(); } catch (e) {}
-      }
-
-      const call = peer.call(viewerPeerId, combinedStream, {
-        sdpTransform: enhanceSdpSafe
-      });
-
-      if (!call) return;
-
-      const pc = call.peerConnection;
-      if (pc) {
-        activeViewers.set(viewerPeerId, {
-          call,
-          pc,
-          lastBytes: 0,
-          lastTimestamp: performance.now()
-        });
-        updateViewerCount();
-
-        pc.addEventListener('connectionstatechange', () => {
-          if (pc.connectionState === 'connected') {
-            applySenderQualityParameters(pc);
-          } else if (['failed', 'closed'].includes(pc.connectionState)) {
-            activeViewers.delete(viewerPeerId);
-            updateViewerCount();
-          }
-        });
-
-        setTimeout(() => applySenderQualityParameters(pc), 600);
-        setTimeout(() => applySenderQualityParameters(pc), 2000);
-      }
-    }
-
     function updateViewerCount() {
-      const count = Math.max(activeViewers.size, knownViewerIds.size);
+      const allIds = new Set([...activeViewers.keys(), ...dataConnections.keys()]);
+      const count = allIds.size;
       viewerCountEl.textContent = `${count} espectador${count === 1 ? '' : 'es'}`;
-    }
-
-    function callAllKnownViewers() {
-      for (const viewerId of knownViewerIds) {
-        callViewer(viewerId);
-      }
     }
 
     // Telemetría cada segundo
@@ -979,7 +1018,7 @@
       }
 
       if (activeViewers.size === 0) {
-        statVideoBitrate.textContent = '0 espectadores en sala';
+        statVideoBitrate.textContent = 'Esperando espectador...';
         return;
       }
 
@@ -1012,7 +1051,7 @@
           }
 
           if (report.type === 'candidate-pair' && report.state === 'succeeded') {
-            statNetType.textContent = 'Conectado OK';
+            statNetType.textContent = 'Transmitiendo OK';
             statNetType.style.color = 'var(--success)';
           }
         });
@@ -1035,9 +1074,12 @@
     });
 
     applyRoomBtn.addEventListener('click', () => {
-      const cleanId = roomIdInput.value.trim().replace(/[^a-zA-Z0-9_-]/g, '-');
+      let cleanId = roomIdInput.value.trim().replace(/[^a-zA-Z0-9_-]/g, '-');
+      if (cleanId.toLowerCase() === 'cine') {
+        cleanId = `cine-${Math.random().toString(36).substring(2, 6)}`;
+        alert(`El nombre "cine" a secas choca en el servidor público. Se asignó "${cleanId}" para que tu esposa conecte sin bloqueos.`);
+      }
       if (cleanId) {
-        knownViewerIds.clear();
         activeViewers.clear();
         dataConnections.clear();
         initPeer(cleanId);

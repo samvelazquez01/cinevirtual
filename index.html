@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CineP2P — Sala de Cine en Tiempo Real</title>
+  <title>CineP2P — Sala de Cine en Tiempo Real (v5.0)</title>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <style>
     :root {
@@ -62,6 +62,8 @@
       pointer-events: none;
       z-index: 20;
       transition: opacity 0.35s ease;
+      flex-wrap: wrap;
+      gap: 0.5rem;
     }
 
     .stage.hide-ui .top-bar,
@@ -193,22 +195,22 @@
       background: rgba(255, 255, 255, 0.15);
     }
 
-    /* Botón flotante para desbloquear audio si el navegador lo silencia por autoplay */
+    /* Botón flotante para desbloquear audio/video en Safari iOS y Chrome */
     .unmute-banner {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
       z-index: 25;
-      background: rgba(99, 102, 241, 0.95);
+      background: rgba(99, 102, 241, 0.96);
       color: white;
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      padding: 1rem 1.75rem;
+      border: 2px solid rgba(255, 255, 255, 0.35);
+      padding: 1.05rem 1.85rem;
       border-radius: 999px;
       font-size: 1.05rem;
       font-weight: 700;
       cursor: pointer;
-      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.65);
       display: none;
       align-items: center;
       gap: 0.65rem;
@@ -240,6 +242,7 @@
       z-index: 20;
       transition: opacity 0.35s ease;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      flex-wrap: wrap;
     }
 
     .controls-group {
@@ -300,7 +303,7 @@
     <!-- Barra Superior -->
     <div class="top-bar">
       <div class="pill">
-        <span>🍿 CineP2P</span>
+        <span>🍿 CineP2P v5.0</span>
         <span style="color: var(--muted);">|</span>
         <div id="statusDot" class="dot"></div>
         <span id="statusLabel">Esperando sala...</span>
@@ -343,18 +346,18 @@
       <h2 id="cardTitle">Conectar a la Transmisión</h2>
       <p id="cardDesc">Introduce el código de la sala o abre directamente el enlace que te compartió el emisor.</p>
       <div class="input-row">
-        <input type="text" id="roomInput" placeholder="Ej: cine-a1b2c3" />
+        <input type="text" id="roomInput" placeholder="Ej: sala-a1b2c" />
         <button id="joinBtn" class="btn">Entrar</button>
       </div>
     </div>
 
     <!-- Botón para activar sonido si el navegador bloqueó el audio automático -->
     <button id="unmuteBanner" class="unmute-banner">
-      🔊 Haz clic aquí para activar el Audio Estéreo
+      🔊 Toca aquí para activar el Audio Estéreo y Video
     </button>
 
     <!-- Reproductor de Video Principal -->
-    <video id="remoteVideo" autoplay playsinline></video>
+    <video id="remoteVideo" autoplay playsinline webkit-playsinline></video>
 
     <!-- Barra Inferior de Controles -->
     <div class="bottom-bar">
@@ -408,11 +411,14 @@
     let currentCall = null;
     let targetRoomId = null;
     let retryTimer = null;
+    let dummyViewerStream = null;
+    let hasReceivedFrames = false;
 
     let lastVideoBytes = 0;
     let lastAudioBytes = 0;
     let lastStatsTime = performance.now();
 
+    // Servidores STUN + TURN Internacionales redundantes (Puertos 80 y 443 UDP/TCP/TLS)
     const rtcConfig = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -421,9 +427,21 @@
         {
           urls: [
             'turn:openrelay.metered.ca:80',
+            'turn:openrelay.metered.ca:80?transport=tcp',
             'turn:openrelay.metered.ca:443',
             'turn:openrelay.metered.ca:443?transport=tcp',
             'turns:openrelay.metered.ca:443?transport=tcp'
+          ],
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: [
+            'turn:standard.relay.metered.ca:80',
+            'turn:standard.relay.metered.ca:80?transport=tcp',
+            'turn:standard.relay.metered.ca:443',
+            'turn:standard.relay.metered.ca:443?transport=tcp',
+            'turns:standard.relay.metered.ca:443?transport=tcp'
           ],
           username: 'openrelayproject',
           credential: 'openrelayproject'
@@ -440,8 +458,50 @@
       );
     }
 
+    /**
+     * Crea un stream silencioso/vacío ultra-ligero (1x1px + silencio) sin pedir permisos de cámara/micrófono.
+     * Esto permite que el espectador llame directamente al emisor con peer.call(targetRoomId, dummyStream)
+     * negociando las líneas m=video y m=audio a través de cualquier NAT/Firewall internacional o Safari iOS.
+     */
+    function getOrCreateViewerDummyStream() {
+      if (dummyViewerStream) return dummyViewerStream;
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 2;
+        canvas.height = 2;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, 2, 2);
+        const canvasStream = canvas.captureStream ? canvas.captureStream(1) : null;
+
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioCtx();
+        const dst = audioCtx.createMediaStreamDestination();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        gain.gain.value = 0; // 100% silencio
+        osc.connect(gain);
+        gain.connect(dst);
+        osc.start();
+
+        const tracks = [];
+        if (canvasStream && canvasStream.getVideoTracks()[0]) {
+          tracks.push(canvasStream.getVideoTracks()[0]);
+        }
+        if (dst.stream && dst.stream.getAudioTracks()[0]) {
+          tracks.push(dst.stream.getAudioTracks()[0]);
+        }
+        dummyViewerStream = new MediaStream(tracks);
+      } catch (e) {
+        dummyViewerStream = new MediaStream();
+      }
+      return dummyViewerStream;
+    }
+
     function leaveRoom() {
       clearInterval(retryTimer);
+      hasReceivedFrames = false;
+
       if (dataConn && dataConn.open) {
         try { dataConn.send({ type: 'VIEWER_LEFT' }); } catch (e) {}
       }
@@ -463,7 +523,6 @@
       unmuteBanner.style.display = 'none';
       leaveBtnTop.style.display = 'none';
 
-      // Limpiar parámetro ?sala de la barra de direcciones para poder escribir otro
       const cleanUrl = new URL(window.location.href);
       cleanUrl.searchParams.delete('sala');
       cleanUrl.searchParams.delete('id');
@@ -484,9 +543,47 @@
       cardDesc.textContent = 'Puedes introducir otro código de sala o volver a entrar cuando quieras.';
     }
 
+    function handleIncomingRemoteStream(remoteStream, callObj) {
+      if (!remoteStream) return;
+      currentCall = callObj;
+
+      // IMPORTANTE PARA SAFARI iOS: Empezar silenciado (muted=true) para que Safari renderice el video inmediatamente y no lo deje en negro
+      remoteVideo.srcObject = remoteStream;
+      remoteVideo.muted = true;
+      remoteVideo.play().then(() => {
+        // Mostrar botón grande para activar el sonido con un toque del usuario (requerido por Safari/iOS y Chrome móvil)
+        unmuteBanner.style.display = 'flex';
+        updateMuteUI();
+      }).catch(() => {
+        unmuteBanner.style.display = 'flex';
+      });
+
+      connectCard.style.display = 'none';
+      statusDot.className = 'dot live';
+      statusLabel.textContent = `En Directo (${targetRoomId})`;
+    }
+
+    function initiateDirectMediaCall() {
+      if (!peer || !targetRoomId || hasReceivedFrames) return;
+      try {
+        const dummy = getOrCreateViewerDummyStream();
+        const outboundCall = peer.call(targetRoomId, dummy, {
+          sdpTransform: enhanceAnswerSdp
+        });
+        if (!outboundCall) return;
+
+        outboundCall.on('stream', (remoteStream) => {
+          handleIncomingRemoteStream(remoteStream, outboundCall);
+        });
+      } catch (e) {
+        console.warn('Intento de llamada directa:', e);
+      }
+    }
+
     function connectToBroadcaster(roomId) {
       if (!roomId) return;
       clearInterval(retryTimer);
+      hasReceivedFrames = false;
 
       targetRoomId = roomId.trim();
       roomInput.value = targetRoomId;
@@ -497,7 +594,7 @@
       window.history.replaceState({}, '', newUrl);
 
       cardTitle.textContent = 'Conectando a la sala...';
-      cardDesc.textContent = `Buscando señal en vivo de "${targetRoomId}"...`;
+      cardDesc.textContent = `Estableciendo conexión internacional con "${targetRoomId}"...`;
       statusDot.className = 'dot';
       statusLabel.textContent = `Sala: ${targetRoomId}`;
 
@@ -511,105 +608,91 @@
       });
 
       peer.on('open', () => {
+        // 1. Iniciar canal de datos Y TAMBIÉN llamada directa de medios (doble vía para atravesar cualquier firewall/país)
         openDataChannel();
+        initiateDirectMediaCall();
+
+        // Reintentar cada 3.5 segundos mientras no estén entrando bytes reales de video
+        clearInterval(retryTimer);
+        retryTimer = setInterval(() => {
+          if (!hasReceivedFrames && peer && !peer.destroyed) {
+            if (dataConn && dataConn.open) {
+              dataConn.send({ type: 'REQUEST_STREAM' });
+            } else {
+              openDataChannel();
+            }
+            initiateDirectMediaCall();
+          } else if (hasReceivedFrames) {
+            clearInterval(retryTimer);
+          }
+        }, 3500);
       });
 
-      // Recibir la llamada WebRTC con el stream de alta calidad
-      peer.on('call', (call) => {
-        if (currentCall) {
-          try { currentCall.close(); } catch (e) {}
-        }
-        currentCall = call;
-
-        call.answer(undefined, {
+      // 2. Si el emisor nos devuelve la llamada hacia nosotros, también la aceptamos
+      peer.on('call', (incomingCall) => {
+        incomingCall.answer(undefined, {
           sdpTransform: enhanceAnswerSdp
         });
 
-        call.on('stream', (remoteStream) => {
-          clearInterval(retryTimer);
-
-          remoteVideo.srcObject = remoteStream;
-          connectCard.style.display = 'none';
-          statusDot.className = 'dot live';
-          statusLabel.textContent = `En Directo (${targetRoomId})`;
-
-          // Intentar reproducir con sonido; si el navegador exige interacción del usuario, mostrar el botón de 1 clic
-          remoteVideo.muted = false;
-          const playPromise = remoteVideo.play();
-          if (playPromise !== undefined) {
-            playPromise.catch(() => {
-              remoteVideo.muted = true;
-              remoteVideo.play().catch(() => {});
-              unmuteBanner.style.display = 'flex';
-              updateMuteUI();
-            });
-          }
-        });
-
-        call.on('close', () => {
-          statusDot.className = 'dot';
-          statusLabel.textContent = 'Transmisión en pausa';
-          connectCard.style.display = 'flex';
-          cardTitle.textContent = 'Transmisión en pausa';
-          cardDesc.textContent = 'El emisor detuvo la captura. En cuanto vuelva a compartir, se verá automáticamente.';
+        incomingCall.on('stream', (remoteStream) => {
+          handleIncomingRemoteStream(remoteStream, incomingCall);
         });
       });
 
       peer.on('error', (err) => {
         console.warn('Error Peer:', err);
-        statusDot.className = 'dot';
-        statusLabel.textContent = 'Esperando al emisor...';
-        connectCard.style.display = 'flex';
-        cardTitle.textContent = 'Esperando al Emisor...';
-        cardDesc.textContent = `Aún no está transmitiendo la sala "${targetRoomId}". Reintentando conexión automáticamente...`;
+        if (!hasReceivedFrames) {
+          statusDot.className = 'dot';
+          statusLabel.textContent = 'Reintentando conexión...';
+          connectCard.style.display = 'flex';
+          cardTitle.textContent = 'Conectando con el Emisor...';
+          cardDesc.textContent = `Buscando señal activa en la sala "${targetRoomId}". Verifica que el emisor haya pulsado "Transmitir Pantalla".`;
+        }
       });
     }
 
     function openDataChannel() {
       if (!peer || !targetRoomId) return;
 
-      dataConn = peer.connect(targetRoomId, { reliable: true });
+      try {
+        dataConn = peer.connect(targetRoomId, { reliable: true });
 
-      dataConn.on('open', () => {
-        statusLabel.textContent = 'Conectado. Solicitando video...';
-        cardTitle.textContent = 'Conectado con el Emisor';
-        cardDesc.textContent = 'Recibiendo señal de video y audio...';
-        dataConn.send({ type: 'REQUEST_STREAM' });
-
-        // Si en 2.5 segundos aún no llegó el stream de video, volver a pedirlo automáticamente
-        clearInterval(retryTimer);
-        retryTimer = setInterval(() => {
-          if ((!remoteVideo.srcObject || remoteVideo.readyState === 0) && dataConn && dataConn.open) {
-            dataConn.send({ type: 'REQUEST_STREAM' });
-          } else {
-            clearInterval(retryTimer);
+        dataConn.on('open', () => {
+          if (!hasReceivedFrames) {
+            statusLabel.textContent = 'Conectado. Recibiendo señal...';
+            cardTitle.textContent = 'Conectado con el Emisor';
+            cardDesc.textContent = 'Abriendo flujo de video y audio...';
           }
-        }, 2500);
-      });
+          dataConn.send({ type: 'REQUEST_STREAM' });
+        });
 
-      dataConn.on('data', (data) => {
-        if (!data) return;
-        if (data.type === 'WAITING_STREAM') {
-          cardTitle.textContent = 'Dentro de la sala — Esperando captura';
-          cardDesc.textContent = 'Estás conectado. En cuanto el emisor pulse "Capturar Pantalla + Audio PC", verás la película automáticamente.';
-        } else if (data.type === 'STREAM_STOPPED') {
-          remoteVideo.srcObject = null;
-          connectCard.style.display = 'flex';
-          cardTitle.textContent = 'Captura detenida por el emisor';
-          cardDesc.textContent = 'Esperando a que el emisor seleccione otra ventana o pantalla...';
-        } else if (data.type === 'ROOM_CLOSED') {
-          leaveRoom();
-          cardTitle.textContent = 'El emisor cerró la sala';
-          cardDesc.textContent = 'La sesión ha finalizado.';
-        }
-      });
+        dataConn.on('data', (data) => {
+          if (!data) return;
+          if (data.type === 'WAITING_STREAM') {
+            cardTitle.textContent = 'Dentro de la sala — Esperando captura';
+            cardDesc.textContent = 'Estás conectado. En cuanto el emisor pulse "Transmitir Pantalla + Audio", verás la película.';
+          } else if (data.type === 'STREAM_READY') {
+            initiateDirectMediaCall();
+          } else if (data.type === 'STREAM_STOPPED') {
+            hasReceivedFrames = false;
+            remoteVideo.srcObject = null;
+            connectCard.style.display = 'flex';
+            cardTitle.textContent = 'Captura en pausa';
+            cardDesc.textContent = 'El emisor detuvo la captura temporalmente.';
+          } else if (data.type === 'ROOM_CLOSED') {
+            leaveRoom();
+            cardTitle.textContent = 'El emisor cerró la sala';
+            cardDesc.textContent = 'La sesión ha finalizado.';
+          }
+        });
+      } catch (e) {}
     }
 
-    // Activar sonido al hacer clic en el aviso
+    // Activar sonido y reproducción con gesto del usuario (Desbloquea Safari iOS y Chrome Android/PC)
     unmuteBanner.addEventListener('click', () => {
       remoteVideo.muted = false;
       remoteVideo.volume = parseFloat(volumeSlider.value) || 1;
-      remoteVideo.play();
+      remoteVideo.play().catch(() => {});
       unmuteBanner.style.display = 'none';
       updateMuteUI();
     });
@@ -625,6 +708,7 @@
     muteBtn.addEventListener('click', () => {
       remoteVideo.muted = !remoteVideo.muted;
       if (!remoteVideo.muted) {
+        remoteVideo.play().catch(() => {});
         unmuteBanner.style.display = 'none';
       }
       updateMuteUI();
@@ -642,7 +726,10 @@
     });
 
     fullscreenBtn.addEventListener('click', () => {
-      if (!document.fullscreenElement) {
+      if (remoteVideo.webkitEnterFullscreen) {
+        // Soporte nativo de pantalla completa para iPhone / Safari iOS
+        remoteVideo.webkitEnterFullscreen();
+      } else if (!document.fullscreenElement) {
         stage.requestFullscreen().catch(() => {});
       } else {
         document.exitFullscreen().catch(() => {});
@@ -691,7 +778,7 @@
       }
     });
 
-    // Auto-ocultar controles cuando el ratón no se mueve viendo la película
+    // Auto-ocultar controles cuando el ratón no se mueve
     let uiTimeout = null;
     stage.addEventListener('mousemove', () => {
       stage.classList.remove('hide-ui');
@@ -717,6 +804,9 @@
         stats.forEach(report => {
           if (report.type === 'inbound-rtp' && report.kind === 'video') {
             const bytes = report.bytesReceived || 0;
+            if (bytes > 1000) {
+              hasReceivedFrames = true;
+            }
             if (elapsedSec > 0 && lastVideoBytes > 0) {
               const mbps = (((bytes - lastVideoBytes) * 8) / elapsedSec / 1_000_000).toFixed(2);
               statBitrate.textContent = `${mbps} Mbps`;
