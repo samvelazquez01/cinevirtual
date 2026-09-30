@@ -455,8 +455,8 @@
         <div class="form-group">
           <label><span>Prioridad del Codificador</span></label>
           <select id="degradationSelect">
-            <option value="maintain-resolution" selected>Mantener Nitidez 1:1 (Sin pixelado)</option>
-            <option value="maintain-framerate">Priorizar Fluidez 60 FPS</option>
+            <option value="maintain-resolution">Mantener Nitidez 1:1 (texto / pantallas)</option>
+            <option value="maintain-framerate" selected>Priorizar Fluidez (recomendado para películas)</option>
             <option value="balanced">Equilibrado</option>
           </select>
         </div>
@@ -523,6 +523,7 @@
     let combinedStream = null;
     let fileObjectUrl = null;
     let roomClosedManually = false;
+    let idRetries = 0;
 
     let audioContext = null;
     let analyserNode = null;
@@ -536,50 +537,35 @@
     const rtcConfig = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun.cloudflare.com:3478' },
-        {
-          urls: [
-            'turn:a.relay.metered.ca:80',
-            'turn:a.relay.metered.ca:80?transport=tcp',
-            'turn:a.relay.metered.ca:443',
-            'turn:a.relay.metered.ca:443?transport=tcp',
-            'turns:a.relay.metered.ca:443?transport=tcp'
-          ],
-          username: 'e8dd65c92f611c4086f8fc20',
-          credential: '2/3+R/aH1h2N+N9Y'
-        },
-        {
-          urls: [
-            'turn:openrelay.metered.ca:80',
-            'turn:openrelay.metered.ca:80?transport=tcp',
-            'turn:openrelay.metered.ca:443',
-            'turn:openrelay.metered.ca:443?transport=tcp',
-            'turns:openrelay.metered.ca:443?transport=tcp'
-          ],
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: [
-            'turn:standard.relay.metered.ca:80',
-            'turn:standard.relay.metered.ca:80?transport=tcp',
-            'turn:standard.relay.metered.ca:443',
-            'turn:standard.relay.metered.ca:443?transport=tcp',
-            'turns:standard.relay.metered.ca:443?transport=tcp'
-          ],
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        }
+        { urls: 'stun:stun.relay.metered.ca:80' },
+        { urls: 'turn:global.relay.metered.ca:80', username: '0fbef837c9a591b641b5bc61', credential: 'hzp0YU55SlDsgtOd' },
+        { urls: 'turn:global.relay.metered.ca:80?transport=tcp', username: '0fbef837c9a591b641b5bc61', credential: 'hzp0YU55SlDsgtOd' },
+        { urls: 'turn:global.relay.metered.ca:443', username: '0fbef837c9a591b641b5bc61', credential: 'hzp0YU55SlDsgtOd' },
+        { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: '0fbef837c9a591b641b5bc61', credential: 'hzp0YU55SlDsgtOd' },
       ],
-      iceCandidatePoolSize: 10
+      iceCandidatePoolSize: 0
     };
+
+    // ===== TURN GRATIS (Metered Open Relay, 20 GB/mes) =====
+    // Pega aqui tu URL: https://TUAPP.metered.live/api/v1/turn/credentials?apiKey=TU_API_KEY
+    const TURN_API_URL = '';
+    const rtcConfigReady = (async () => {
+      if (!TURN_API_URL) { return; }
+      try {
+        const r = await fetch(TURN_API_URL);
+        const list = await r.json();
+        if (Array.isArray(list) && list.length) {
+          rtcConfig.iceServers = [{ urls: 'stun:stun.l.google.com:19302' }, ...list];
+          console.info('[CineP2P] Servidores ICE cargados:', list.length);
+        }
+      } catch (e) { console.warn('[CineP2P] No se pudo cargar TURN:', e); }
+    })();
 
     function enhanceSdpSafe(sdp) {
       if (!sdp) return sdp;
       return sdp.replace(
         /a=fmtp:(\d+) minptime=10;useinbandfec=1([^\r\n]*)/g,
-        'a=fmtp:$1 minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1;maxaveragebitrate=320000;maxplaybackrate=48000;cbr=1;usedtx=0$2'
+        'a=fmtp:$1 minptime=10;useinbandfec=1;stereo=1;sprop-stereo=1;maxaveragebitrate=192000;maxplaybackrate=48000;cbr=1;usedtx=0$2'
       );
     }
 
@@ -650,7 +636,7 @@
             displaySurface: 'monitor',
             width: { ideal: 1920, max: 3840 },
             height: { ideal: 1080, max: 2160 },
-            frameRate: { ideal: 60, max: 60 }
+            frameRate: { ideal: 30, max: 30 }
           },
           audio: {
             echoCancellation: false,
@@ -808,6 +794,7 @@
       });
 
       peer.on('open', (id) => {
+        idRetries = 0;
         statusDot.className = 'dot live';
         statusText.textContent = `Sala activa (${id})`;
         roomIdInput.value = id;
@@ -851,10 +838,7 @@
           if (data.type === 'REQUEST_STREAM') {
             if (combinedStream) {
               // Solo llamamos hacia afuera si este espectador no tiene ya una llamada en curso
-              const existing = activeViewers.get(conn.peer);
-              if (!existing || !existing.pc || ['failed', 'closed', 'disconnected'].includes(existing.pc.connectionState)) {
-                callViewerOutward(conn.peer);
-              }
+              conn.send({ type: 'STREAM_READY' });
             } else {
               conn.send({ type: 'WAITING_STREAM' });
             }
@@ -868,12 +852,21 @@
         });
       });
 
+      peer.on('disconnected', () => { if (peer && !peer.destroyed && !roomClosedManually) { try { peer.reconnect(); } catch (e) {} } });
+
       peer.on('error', (err) => {
         console.warn('PeerJS Warning:', err);
         if (err.type === 'unavailable-id') {
-          const fallbackId = generateRoomId();
-          localStorage.setItem('cinep2p_room_id', fallbackId);
-          initPeer(fallbackId);
+          if (idRetries < 5) {
+            idRetries++;
+            statusText.textContent = `Sala ocupada, reintentando (${idRetries}/5)...`;
+            setTimeout(() => { if (!roomClosedManually) initPeer(idToUse); }, 3000);
+          } else {
+            idRetries = 0;
+            const fallbackId = generateRoomId();
+            localStorage.setItem('cinep2p_room_id', fallbackId);
+            initPeer(fallbackId);
+          }
         } else if (!roomClosedManually) {
           statusText.textContent = `Aviso: ${err.type}`;
         }
@@ -926,7 +919,6 @@
     function broadcastStreamToAllViewers() {
       for (const [viewerId, conn] of dataConnections) {
         try { conn.send({ type: 'STREAM_READY' }); } catch (e) {}
-        callViewerOutward(viewerId);
       }
     }
 
@@ -983,7 +975,7 @@
               params.encodings = [{}];
             }
             params.encodings[0].maxBitrate = maxBitrate;
-            params.encodings[0].maxFramerate = 60;
+            params.encodings[0].maxFramerate = 30;
             params.encodings[0].scaleResolutionDownBy = 1.0;
             params.degradationPreference = degradationPreference;
             await sender.setParameters(params);
@@ -997,7 +989,7 @@
             if (!params.encodings || params.encodings.length === 0) {
               params.encodings = [{}];
             }
-            params.encodings[0].maxBitrate = 320000;
+            params.encodings[0].maxBitrate = 192000;
             await sender.setParameters(params);
           } catch (e) {}
         }
@@ -1058,13 +1050,27 @@
             }
           }
 
-          if (report.type === 'candidate-pair' && report.state === 'succeeded') {
-            statNetType.textContent = 'Transmitiendo OK';
+          if (report.type === 'candidate-pair' && report.state === 'succeeded' && report.nominated) {
+            const lc = stats.get(report.localCandidateId), rc = stats.get(report.remoteCandidateId);
+            const relayed = (lc && lc.candidateType === 'relay') || (rc && rc.candidateType === 'relay');
+            statNetType.textContent = relayed ? 'OK · vía Relay TURN' : 'OK · Directo';
             statNetType.style.color = 'var(--success)';
           }
         });
       } catch (e) {}
     }, 1000);
+
+    // Avisar al espectador cuando se pausa o reanuda (modo archivo)
+    function notifyViewers(type) { for (const [, c] of dataConnections) { try { c.send({ type }); } catch (e) {} } }
+    localVideo.addEventListener('pause', () => { if (fileObjectUrl) notifyViewers('PAUSED'); });
+    localVideo.addEventListener('play', () => { if (fileObjectUrl) notifyViewers('PLAYING'); });
+
+    // Evitar que la PC se duerma
+    let wakeLock = null;
+    async function requestWakeLock() { try { if ('wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } } catch (e) {} }
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && combinedStream) requestWakeLock(); });
+    startScreenBtn.addEventListener('click', requestWakeLock);
+    movieFileInput.addEventListener('change', requestWakeLock);
 
     stopBtn.addEventListener('click', stopCapture);
     leaveRoomBtn.addEventListener('click', leaveOrReopenRoom);
@@ -1105,7 +1111,24 @@
       }
     });
 
-    initPeer();
+    rtcConfigReady.then(() => initPeer());
+
+    // Prueba automática de TURN en el emisor
+    (async () => {
+      await rtcConfigReady;
+      try {
+        const pc = new RTCPeerConnection({ iceServers: rtcConfig.iceServers, iceTransportPolicy: 'relay' });
+        let relay = 0; const errs = [];
+        pc.addEventListener('icecandidate', e => { if (e.candidate && e.candidate.type === 'relay') relay++; });
+        pc.addEventListener('icecandidateerror', e => errs.push(e.errorCode + ' ' + (e.url || '')));
+        pc.createDataChannel('t');
+        await pc.setLocalDescription(await pc.createOffer());
+        await new Promise(r => { const t = setTimeout(r, 6000); pc.addEventListener('icegatheringstatechange', () => { if (pc.iceGatheringState === 'complete') { clearTimeout(t); r(); } }); });
+        pc.close();
+        statNetType.textContent = relay ? 'TURN OK' : 'TURN FALLA (' + (errs[0] || 'sin respuesta') + ')';
+        statNetType.style.color = relay ? 'var(--success)' : 'var(--danger)';
+      } catch (e) { console.warn(e); }
+    })();
   </script>
 </body>
 </html>

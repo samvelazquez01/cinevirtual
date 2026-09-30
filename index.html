@@ -326,6 +326,7 @@
       <div class="pill" style="gap: 0.45rem;">
         <span id="liveQualityBadge" style="color: #a5b4fc;">Conectando...</span>
         <button id="toggleStatsBtn" class="btn btn-ghost" style="padding: 0.28rem 0.6rem;">📊 Info Señal</button>
+        <button id="dxBtn" class="btn btn-ghost" style="padding: 0.28rem 0.6rem;">🩺</button>
         <button id="leaveBtnTop" class="btn btn-danger" style="padding: 0.28rem 0.7rem; display: none;">🚪 Salir</button>
       </div>
     </div>
@@ -557,6 +558,7 @@
      */
     function handleIncomingRemoteStream(remoteStream, callObj) {
       if (!remoteStream) return;
+      dlog('stream recibido');
       currentCall = callObj;
 
       if (remoteVideo.srcObject !== remoteStream) {
@@ -609,6 +611,8 @@
 
         currentCall = outboundCall;
         callStartedAt = Date.now();
+        dlog('llamando al emisor...');
+        watchPC(outboundCall.peerConnection, 'video');
         outboundCall.on('stream', (remoteStream) => {
           handleIncomingRemoteStream(remoteStream, outboundCall);
         });
@@ -641,12 +645,15 @@
       }
 
       await rtcConfigReady;
+      dlog('Conectando a sala ' + targetRoomId);
+      setTimeout(() => { if (!hasReceivedFrames) { openDx(); testTurn('[viewer] '); } }, 20000);
       peer = new Peer({
         config: rtcConfig,
         debug: 1
       });
 
       peer.on('open', () => {
+        dlog('señalización OK');
         openDataChannel();
         initiateDirectMediaCall();
 
@@ -688,10 +695,12 @@
         });
       });
 
-      peer.on('disconnected', () => { if (peer && !peer.destroyed) { try { peer.reconnect(); } catch (e) {} } });
+      peer.on('disconnected', () => { dlog('señalización caída, reconectando'); if (peer && !peer.destroyed) { try { peer.reconnect(); } catch (e) {} } });
 
       peer.on('error', (err) => {
         console.warn('Error Peer:', err);
+        dlog('PeerJS error: ' + err.type + ' ' + (err.message || ''));
+        openDx();
         if (!hasReceivedFrames) {
           statusDot.className = 'dot';
           statusLabel.textContent = 'Esperando señal...';
@@ -709,6 +718,9 @@
 
       try {
         dataConn = peer.connect(targetRoomId, { reliable: true });
+        watchPC(dataConn.peerConnection, 'datos');
+        dataConn.on('error', (e) => dlog('datos error: ' + e.type));
+        dataConn.on('open', () => dlog('canal de datos ABIERTO'));
 
         dataConn.on('open', () => {
           if (!hasReceivedFrames) {
@@ -718,6 +730,7 @@
 
         dataConn.on('data', (data) => {
           if (!data) return;
+          dlog('emisor dice: ' + data.type);
           if (data.type === 'WAITING_STREAM') {
             cardTitle.textContent = 'Dentro de la sala — Esperando película';
             cardDesc.textContent = 'Conectado correctamente. En cuanto el emisor pulse "Transmitir Pantalla", verás la imagen.';
@@ -973,6 +986,41 @@
     pauseToast.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:24;background:rgba(0,0,0,.75);color:#fff;padding:.8rem 1.4rem;border-radius:999px;font-weight:700;display:none;';
     stage.appendChild(pauseToast);
     function showPauseToast(t) { pauseToast.textContent = t; pauseToast.style.display = t ? 'block' : 'none'; }
+
+    // ===== DIAGNÓSTICO (botón 🩺) =====
+    const dlogLines = [];
+    const dlogBox = document.createElement('pre');
+    dlogBox.style.cssText = 'position:absolute;top:4.2rem;left:1rem;right:1rem;max-height:55vh;overflow:auto;z-index:40;background:rgba(0,0,0,.9);color:#a7f3d0;font:11px/1.35 monospace;padding:.7rem;border-radius:10px;display:none;white-space:pre-wrap;user-select:text;';
+    stage.appendChild(dlogBox);
+    function dlog(m) { dlogLines.push(new Date().toLocaleTimeString() + ' ' + m); if (dlogLines.length > 80) dlogLines.shift(); dlogBox.textContent = dlogLines.join('\n'); dlogBox.scrollTop = dlogBox.scrollHeight; console.log('[dx]', m); }
+    function openDx() { dlogBox.style.display = 'block'; }
+    function watchPC(pc, label) {
+      if (!pc || pc._dx) return; pc._dx = true;
+      const c = {};
+      pc.addEventListener('icecandidate', e => { if (e.candidate) { const t = e.candidate.type || '?'; c[t] = (c[t] || 0) + 1; } else dlog(label + ' candidatos locales: ' + JSON.stringify(c)); });
+      pc.addEventListener('icecandidateerror', e => dlog(label + ' ICE error ' + e.errorCode + ' ' + (e.url || '') + ' ' + (e.errorText || '')));
+      pc.addEventListener('iceconnectionstatechange', () => dlog(label + ' ice=' + pc.iceConnectionState));
+      pc.addEventListener('connectionstatechange', () => dlog(label + ' conn=' + pc.connectionState));
+    }
+    async function testTurn(label) {
+      dlog(label + 'probando TURN (solo relay)...');
+      try {
+        const pc = new RTCPeerConnection({ iceServers: rtcConfig.iceServers, iceTransportPolicy: 'relay' });
+        let relay = 0; const errs = [];
+        pc.addEventListener('icecandidate', e => { if (e.candidate && e.candidate.type === 'relay') relay++; });
+        pc.addEventListener('icecandidateerror', e => errs.push(e.errorCode + ' ' + (e.url || '')));
+        pc.createDataChannel('t');
+        await pc.setLocalDescription(await pc.createOffer());
+        await new Promise(r => { const t = setTimeout(r, 6000); pc.addEventListener('icegatheringstatechange', () => { if (pc.iceGatheringState === 'complete') { clearTimeout(t); r(); } }); });
+        pc.close();
+        dlog(label + (relay ? 'TURN OK (' + relay + ' relay)' : 'TURN FALLA: 0 relay. Errores: ' + (errs.join(' | ') || 'ninguno')));
+      } catch (e) { dlog(label + 'prueba TURN error: ' + e); }
+    }
+    document.getElementById('dxBtn').addEventListener('click', () => {
+      const show = dlogBox.style.display !== 'block';
+      dlogBox.style.display = show ? 'block' : 'none';
+      if (show) testTurn('[viewer] ');
+    });
 
     // Leer automáticamente ?sala=... de la URL al abrir el enlace
     window.addEventListener('DOMContentLoaded', () => {
